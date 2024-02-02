@@ -10,7 +10,10 @@ from matplotlib.backend_bases import key_press_handler
 from matplotlib.figure import Figure
 
 class Waveframe(ttk.Notebook):
-    def __init__(self, parent, sampleRate=3.E9):
+    def __init__(self,
+                 parent,
+                 sampleRate=3.E9,
+                 figsize=(3,2)):
         self.sampleRate = sampleRate
         super().__init__(parent)
         self.td = ttk.Frame(self)
@@ -18,9 +21,9 @@ class Waveframe(ttk.Notebook):
         self.user = ttk.Frame(self)
         # now add a matplotlib canvas in each one
         self.figs = {}
-        self.figs['time'] = Figure()
-        self.figs['freq'] = Figure()
-        self.figs['user'] = Figure()
+        self.figs['time'] = Figure(figsize=figsize)
+        self.figs['freq'] = Figure(figsize=figsize)
+        self.figs['user'] = Figure(figsize=figsize)
         self.canvs = {}
         self.canvs['time'] = FigureCanvasTkAgg(self.figs['time'],
                                                master=self.td)
