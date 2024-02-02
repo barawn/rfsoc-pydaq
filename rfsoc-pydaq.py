@@ -37,7 +37,7 @@ class RFSoC_Daq:
         for i in range(numChannels):
             thisWf = Waveframe(self.frame, sampleRate)
             self.wf.append(thisWf)
-            thisWf.pack()
+            thisWf.pack(side = tk.LEFT )
 
 def defaultUserCommand():
     return
@@ -86,13 +86,18 @@ if __name__ == '__main__':
     buttons['Acquire'].pack( side = tk.LEFT )
     buttons['User'].pack( side = tk.LEFT )
 
+    buttonFrame.pack( side = tk.TOP )
+
     locals = { 'daq' : daq,
                'buttons' : buttons }
     console = TextConsole( consoleFrame,
                            locals=locals )
     console.pack(fill='both', expand=True)
+    consoleFrame.pack( fill='both', expand=True, side = tk.TOP )
+
 
     log = ScrolledLog( logFrame, logger )
-    log.pack()
+    log.pack(fill='x', expand=True)
+    logFrame.pack( fill='x', side = tk.TOP )
 
     root.mainloop()
