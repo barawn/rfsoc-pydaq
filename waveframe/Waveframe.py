@@ -57,8 +57,11 @@ class Waveframe(ttk.Notebook):
         self.figs['time'].clear()
         self.figs['freq'].clear()
         self.figs['user'].clear()
-        xaxis = np.arange(len(data))/self.sampleRate
+        # we want this in nanoseconds, so divide samplerate by 1E9
+        samplePeriod = 1.E9/self.sampleRate
+        xaxis = np.arange(len(data))*samplePeriod
         self.figs['time'].add_subplot(111).plot(xaxis, data)
+
         self.canvs['time'].draw()
         
         # figure out FFT stuff here
