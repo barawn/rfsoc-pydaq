@@ -35,8 +35,9 @@ class RFSoC_Daq:
         self.dev = None
         self.wf = []
         for i in range(numChannels):
-            self.wf.append(Waveframe(self.frame, sampleRate))
-            self.wf.pack()
+            thisWf = Waveframe(self.frame, sampleRate)
+            self.wf.append(thisWf)
+            thisWf.pack()
 
 def defaultUserCommand():
     return
@@ -47,7 +48,7 @@ def rfsocLoad():
 def rfsocAcquire():
     return
 
-if __name__ == 'main':
+if __name__ == '__main__':
     root = tk.Tk()
     # We have 4 overall frames, just arranged
     # in a single column, so we can just use
@@ -89,9 +90,9 @@ if __name__ == 'main':
                'buttons' : buttons }
     console = TextConsole( consoleFrame,
                            locals=locals )
-    console.pack(fill='bot', expand=True)
+    console.pack(fill='both', expand=True)
 
     log = ScrolledLog( logFrame, logger )
     log.pack()
 
-    root.mainLoop()
+    root.mainloop()
