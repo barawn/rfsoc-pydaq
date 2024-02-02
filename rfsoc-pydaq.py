@@ -56,9 +56,14 @@ def rfsocLoad():
                                            filetypes=[("Python files","*.py"),
                                                       ("All files", "*.*")])
     logger.debug("Asked to load overlay at %s" % file_path)
+    newdir = os.path.dirname(os.path.abspath(file_path))    
+
+    curpath = sys.path
+    logger.debug("Adding directory %s to module search path" % newdir)
+    sys.path.insert(1, newdir)    
     curdir = os.path.abspath(os.curdir)
-    logger.debug("Changing path to %s" % os.path.dirname(os.path.abspath(file_path)))
-    os.chdir(os.path.dirname(os.path.abspath(file_path)))
+    logger.debug("Changing directory to %s" % newdir)
+    os.chdir(newdir)
     base, extension = os.path.splitext(os.path.basename(file_path))
     logger.debug("Going to try to import %s", base)
     # create a custom exception
@@ -98,10 +103,13 @@ def rfsocLoad():
         logger.debug("Created RFSoC device")
     except LocalException as e:
         logger.error(str(e))
-    except:
+    except Exception as e:
         logger.error("Unable to load module %s" % base)
+        logger.error(str(e))
         
-    logger.debug("Restoring original path of %s" % curdir)
+    logger.debug("Restoring original module search path")
+    sys.path = curpath
+    logger.debug("Going back to original directory %s" % curdir)
     os.chdir(curdir)
     return
 
