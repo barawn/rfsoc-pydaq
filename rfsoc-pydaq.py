@@ -1,7 +1,9 @@
 import numpy as np
 import tkinter as tk
+from tkinter import filedialog
 
 import logging
+import os, sys, inspect, importlib
 
 from textconsole.TextConsole import TextConsole
 from scrolledlog.ScrolledLog import ScrolledLog
@@ -16,6 +18,7 @@ numChannels = 4
 numSamples = 2048
 sampleRate = 3.E9
 
+theDaq = None
 
 # THIS IS THE GLOBAL CLASS
 # It gets passed to the internal Python console,
@@ -42,14 +45,77 @@ class RFSoC_Daq:
 def defaultUserCommand():
     return
 
+
 def rfsocLoad():
+    """Load an overlay file describing an RFSoC instance.
+    The overlay needs to support being created bare (just "overlayName()")
+    and must support the "internal_capture( buffer, numChannels )"
+    function.
+    """    
+    file_path = filedialog.askopenfilename(title="Select an overlay module",
+                                           filetypes=[("Python files","*.py"),
+                                                      ("All files", "*.*")])
+    logger.debug("Asked to load overlay at %s" % file_path)
+    curdir = os.path.abspath(os.curdir)
+    logger.debug("Changing path to %s" % os.path.dirname(os.path.abspath(file_path)))
+    os.chdir(os.path.dirname(os.path.abspath(file_path)))
+    base, extension = os.path.splitext(os.path.basename(file_path))
+    logger.debug("Going to try to import %s", base)
+    # create a custom exception
+    class LocalException(Exception):
+        pass
+    
+    try:
+        module = importlib.import_module(base, package=None)
+        # First try to find an Overlay or module.FakeOverlay module.
+        # FakeOverlays need to be defined in the same file.
+        overlayClass = None
+        for name, obj in inspect.getmembers(module):
+            if inspect.isclass(obj):
+                if obj.__name__ == 'Overlay' and obj.__module__ == 'pynq.overlay':
+                    overlayClass = obj
+                if obj.__name__ == 'FakeOverlay' and obj.__module__ == module.__name__:
+                    overlayClass = obj
+        if overlayClass is None:
+            del sys.modules[module.__name__]
+            raise LocalException("Unable to find Overlay class in module %s" % module.__name__)
+        logger.debug("Found Overlay class %s from module %s" % (overlayClass.__name__ , overlayClass.__module__ ))
+        # Now find the module to call
+        theClass = None
+        for name, obj in inspect.getmembers(module):
+            if inspect.isclass(obj):
+                if issubclass(obj, overlayClass) and obj != overlayClass:
+                    theClass = obj
+        if theClass is None:
+            del sys.modules[module.__name__]            
+            raise LocalException("Unable to find a subclassed Overlay in module %s" % module.__name__)
+        captureFn = getattr(theClass, "internal_capture", None)
+        if not callable(captureFn):
+            del sys.modules[module.__name__]
+            raise LocalException("The Overlay %s in module %s has no callable internal_capture method" % (theClass.__name__ , module.__name__ ))
+        logger.debug("Found RFSoC overlay %s" % theClass.__name__)
+        theDaq.dev = theClass()
+        logger.debug("Created RFSoC device")
+    except LocalException as e:
+        logger.error(str(e))
+    except:
+        logger.error("Unable to load module %s" % base)
+        
+    logger.debug("Restoring original path of %s" % curdir)
+    os.chdir(curdir)
     return
 
 def rfsocAcquire():
-    return
+    if theDaq.dev is None:
+        logger.error("No RFSoC device is loaded!")
+    theDaq.dev.internal_capture(theDaq.adcBuffer,
+                                theDaq.numChannels)
+    for i in range(theDaq.numChannels):
+        theDaq.wf[i].plot(theDaq.adcBuffer[i])
 
 if __name__ == '__main__':
     root = tk.Tk()
+    logging.basicConfig(level=logging.DEBUG)
     # We have 4 overall frames, just arranged
     # in a single column, so we can just use
     # the straight pack geometry manager.
@@ -70,6 +136,7 @@ if __name__ == '__main__':
                      numChannels,
                      numSamples,
                      sampleRate )
+    theDaq = daq
     displayFrame.pack( side = tk.TOP )
 
     buttons = {}
