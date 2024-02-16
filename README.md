@@ -13,6 +13,27 @@ https://github.com/barawn/RFSoC-PYNQ-OSU
 which attempts to track/fix those issues, but please read the README
 there because the build system is disaster upon disaster.
 
+## Screenshot
+
+![Screenshot of RFSoC-PyDaq Running](https://github.com/pueo-pynq/rfsoc-pydaq/blob/main/rfsoc-pydaq-screenshot.png)
+
+## Running
+
+To run rfsoc-pydaq, you need to have a directory which contains
+* the Python overlay describing the firmware you're using (e.g. ``zcumts.py``) and anything else it needs. These are usually in the ``python/`` subdirectory.
+* the bitstream and HWH that overlay will load.
+
+Launch rfsoc-pydaq. Click the "Load" button and navigate to the directory containing the Python overlay. Select the Python overlay and click Open. This may take a moment,
+as it's loading the bitstream and likely configuring clocks.
+
+You can now click "Acquire" to view the ADC inputs of the RFSoC. You can interact with the RFSoC overlay via the Python console: it is called ``daq.dev``. You can
+also see the data in the buffer directly in the Python console - it is called ``daq.adcBuffer``. You can plot custom details from that buffer in the User frame
+via ``daq.wf[<channel number>].figs['user'].add_subplot(111).plot(<custom data output>)``. In addition, you can create a custom user callback which will _always_ plot
+what you're doing in the User frame by passing a function to ``daq.wf[<channel number>].set_user_callback()``. The user callback will be called with the data
+(now just a single array, since it's a single channel), the figure, and the canvas.
+
+You can change what the buttons do by accessing ``buttons['Load']``, ``buttons['Acquire']`` and ``buttons['User']``.
+
 ## Subdirectory stuff
 
 The app itself consists of a few features that I haven't seen fully
