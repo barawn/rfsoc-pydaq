@@ -21,7 +21,8 @@ there because the build system is disaster upon disaster.
 
 To run rfsoc-pydaq, you need to have a directory which contains
 * the Python overlay describing the firmware you're using (e.g. ``zcumts.py``) and anything else it needs. These are usually in the ``python/`` subdirectory.
-* the bitstream and HWH that overlay will load.
+* the bitstream and HWH that overlay will load. The bitstream should be referenced by _default_ in the Python overlay (see the examples) and the ``.hwh`` needs to be the same name as the bitstream (``my_bitstream.bit`` needs ``my_bitstream.hwh``)
+* any additional Python modules/files (e.g. clock programming). Generally just copy the python directory entirely and grab the bitstream/HWH from the hardware export (XSA) from "Export->Hardware". __XSA files are zip files__ , you can pull the files out from there.
 
 Launch rfsoc-pydaq. Click the "Load" button and navigate to the directory containing the Python overlay. Select the Python overlay and click Open. This may take a moment,
 as it's loading the bitstream and likely configuring clocks.
