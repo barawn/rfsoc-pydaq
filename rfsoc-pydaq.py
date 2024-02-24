@@ -25,6 +25,29 @@ theDaq = None
 # so it has stuff stored in it.
 # It internally holds the top displays.
 class RFSoC_Daq:
+    """ Class holding all of the data for the current program.
+
+    The RFSoC_Daq class holds all of the user-accessible
+    data for the current program instance involving accessing
+    the RFSoC.
+    
+    Attributes
+    ----------
+
+    numChannels : int
+       Number of channels accessible (usually 4).
+    numSamples : int
+       Number of samples in an acquisition.
+    adcBuffer : numpy.ndarray
+       Buffer containing the last acquired data
+    dev : pynq.Overlay
+       Class representing the current programmed RFSoC    
+    frame : tkinter.Frame 
+       Tk frame holding the Waveframes
+    wf : :obj:`list` of :obj:`waveframe.Waveframe`
+       numChannels list of the Waveframes in the DAQ
+
+    """
     def __init__(self,
                  frame,
                  numChannels = 4,
@@ -165,7 +188,13 @@ if __name__ == '__main__':
 
     locals = { 'daq' : daq,
                'buttons' : buttons }
+    banner =  "rfsoc-pydaq Python %s\n" % sys.version
+    banner += "Locals:"
+    for local in locals:
+        banner += "%s (%s)\n" % ( local, type(locals[local]).__name__)
+
     console = TextConsole( consoleFrame,
+                           banner=banner,
                            locals=locals )
     console.pack(fill='both', expand=True)
     consoleFrame.pack( fill='both', expand=True, side = tk.TOP )
