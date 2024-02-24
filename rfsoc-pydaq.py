@@ -3,7 +3,7 @@ import tkinter as tk
 from tkinter import filedialog
 
 import logging
-import os, sys, inspect, importlib
+import os, sys, inspect, importlib, configparser
 
 from textconsole.TextConsole import TextConsole
 from scrolledlog.ScrolledLog import ScrolledLog
@@ -11,12 +11,10 @@ from waveframe.Waveframe import Waveframe
 
 logger = logging.getLogger(__name__)
 
-# GLOBAL CONFIGS
-# THESE ARE STORED IN THE RFSoC_Daq CLASS
-# BUT ARE HERE SO THEY CAN BE CHANGED EASY
-numChannels = 4
-numSamples = 2048
-sampleRate = 3.E9
+# these values are *default* if no ini is present!
+default_numChannels = 4
+default_numSamples = 2048
+default_sampleRate = 3.E9
 
 theDaq = None
 
@@ -145,6 +143,14 @@ def rfsocAcquire():
         theDaq.wf[i].plot(theDaq.adcBuffer[i])
 
 if __name__ == '__main__':
+    config = configparser.ConfigParser()
+    config.read("rfsoc-pydaq.ini")
+    # just create a blank guy, fallbacks handle it
+    if 'rfsoc_pydaq' not in config:
+        config['rfsoc_pydaq'] = {}
+
+    pydaq_cfg = config['rfsoc_pydaq']
+        
     root = tk.Tk()
     logging.basicConfig(level=logging.DEBUG)
     # We have 4 overall frames, just arranged
@@ -164,9 +170,12 @@ if __name__ == '__main__':
                         borderwidth = 1)
 
     daq = RFSoC_Daq( displayFrame,
-                     numChannels,
-                     numSamples,
-                     sampleRate )
+                     pydaq_cfg.getint('numChannels',
+                                      fallback=default_numChannels),
+                     pydaq_cfg.getint('numSamples',
+                                      fallback=default_numSamples),
+                     pydaq_cfg.getfloat('sampleRate',
+                                        fallback=default_sampleRate))
     theDaq = daq
     displayFrame.pack( side = tk.TOP )
 
