@@ -191,7 +191,8 @@ if __name__ == '__main__':
     banner =  "rfsoc-pydaq Python %s\n" % sys.version
     banner += "Locals:"
     for local in locals:
-        banner += "%s (%s)\n" % ( local, type(locals[local]).__name__)
+        banner += " %s (%s)" % ( local, type(locals[local]).__name__)
+    banner += "\n"
 
     console = TextConsole( consoleFrame,
                            banner=banner,
