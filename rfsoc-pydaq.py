@@ -1,5 +1,3 @@
-##Effectively a backup because I want to move some things arround and the what not
-
 ##Python Imports
 import numpy as np
 import tkinter as tk
@@ -32,6 +30,8 @@ theDaq = None
 
 
 #GUI classe(s)
+
+##Submit button requires numerous compoennts and was easier to make a class
 class submitButton:
     def __init__(self,
                  master,
@@ -157,7 +157,7 @@ class RFSoC_Daq:
         N = len(yf)
         return 2.0/N * np.abs(yf[0:N//2])
     
-    ##Maybe make amp and freq into one method since they basically do the same thing
+    ##Maybe make amp and freq into one method since they basically run the same processes
     def calcWave(self, Ch=0):
         if isinstance(Ch, int) and 0 <= Ch < self.numChannels:
             signal = self.adcBuffer[Ch]
@@ -185,7 +185,7 @@ class RFSoC_Daq:
         else:
             return 'Not an available channel'
         
-    ##Prints
+    ##Prints. For use in the terminal. Don't serve an immense amount of use within the program
     def printWave(self, Ch=-1):
         if isinstance(Ch, int) and 0<=Ch<self.numChannels:
             amplitude, frequency = calcWave(Ch)
@@ -218,6 +218,7 @@ def rfsocLoad(hardware = ""):
     and must support the "internal_capture( buffer, numChannels )"
     function.
     """    
+    ##Edited such that one can automatically load zcumts from within the main loop
     if hardware == "zcumts":
         ##Ammend this location to your leisure
         file_path = '/home/xilinx/python/zcumts.py'
@@ -294,6 +295,7 @@ def rfsocAcquire():
     
     for i in range(theDaq.numChannels):
         theDaq.wf[i].plot(theDaq.adcBuffer[i], portNames[i], theDaq.calcWave(i),[theDaq.plotFreq, theDaq.plotFit])
+    logger.debug("Aquired data")
 
 
 ##Buttons
@@ -306,7 +308,7 @@ def getSubmitInput(value):
         result = value
     return result
 
-
+##Action for submit butttons
 def submitNumSamples(value = 11):
     NSamp = getSubmitInput(value)
     logger.debug(f"Currently have {theDaq.numSamples} samples, you have inputted {2**NSamp} samples")
@@ -343,6 +345,7 @@ def submitNumberOfChannels(value = 4):
         logger.debug("Please input an appropriate number of channels")
         return 'Please input an appropriate number of channels'
     
+##Toggle action
 def toggle(tg, setFunc):
     if tg.config('relief')[-1] == 'sunken':
         tg.config(relief="raised")
@@ -353,11 +356,15 @@ def toggle(tg, setFunc):
     return 'Updated plotting'   
 
 ##Miscellaneous
+##This should return an appropriate figure size such that full screen width should be fully occupied
+##This should be used if one wants to change the number of channels in use and shall adjust the figure size accordingly. However that feature doesn't yet work so you know
 def getAppropriateFigSize():
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
     return (screen_width/(100*theDaq.numChannels),screen_height/250)
 
+##This currently doesn't do what I want
+##Since one has to restart the entire script if any ammendments to methods or variables are made in the code I thought it would be nice to have some kind of reset feature that restarts the program with the ammendments. It doesn't work however.
 def reload_script():
     main_script = sys.argv[0]
     
@@ -383,9 +390,11 @@ if __name__ == '__main__':
     buttonFrame = tk.Frame(master = root,
                            relief = tk.RAISED,
                            borderwidth = 1)
+    ##Added a frame for the toggle buttons
     toggleFrame = tk.Frame(master = root,
                            relief = tk.RAISED,
                            borderwidth = 1)
+    ##Added a frame for submit buttons
     submitFrame = tk.Frame(master = root,
                            relief = tk.RAISED,
                            borderwidth = 1)
@@ -415,7 +424,7 @@ if __name__ == '__main__':
     buttons['User'] = tk.Button(buttonFrame,
                                 text = "User",
                                 command = defaultUserCommand)
-    
+    ##This button throws an error but doesn't stop the program. May as well be ignored till it works
     buttons['Reset'] = tk.Button(buttonFrame,
                                 text = "Reset",
                                 command = reload_script)
@@ -446,12 +455,15 @@ if __name__ == '__main__':
     
     toggleFrame.pack( side = tk.TOP )
     
+    
+    ##Most of these don't do anything important. But it's nice that the submit button infrasturctture is there
     buttons['SetSampleSize'] = submitButton(root, submitFrame, "Set Sample Number (exponent of 2):", sampleExponent, lambda: submitNumSamples(buttons['SetSampleSize']))
     buttons['SetSampleRate'] = submitButton(root, submitFrame, "Set Sample Rate (Redundant):", sampleRate, lambda: submitSampleRate(buttons['SetSampleRate']))
     buttons['SetChannelCount'] = submitButton(root, submitFrame, "Set Number of Channels:", numChannels, lambda: submitNumberOfChannels(buttons['SetChannelCount']))   
     
     submitFrame.pack( side = tk.TOP )
 
+    ##Don't know why it wasn't theDaq in the first place. If there was a good reason for this...
     locals = { 'daq' : theDaq,
                'buttons' : buttons }
     console = TextConsole( consoleFrame,
@@ -464,6 +476,7 @@ if __name__ == '__main__':
     log.pack(fill='x', expand=True)
     logFrame.pack( fill='x', side = tk.TOP )
     
+    ##This automatically loads the zcumts overlay since what other overlay would I load. Also it was a right pain having to go through the file directory from the root directory.
     rfsocLoad(hardware = "zcumts")
         
     root.mainloop()

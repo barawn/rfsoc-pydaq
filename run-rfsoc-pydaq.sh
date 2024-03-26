@@ -6,7 +6,7 @@
 # so we have to do sudo -i, which means we also lose
 # our current directory.
 
+#Assuming this is where pydaq is stored, allows running from anywhere
 CURDIR=/home/xilinx/rfsoc-pydaq # `pwd`
 sudo xauth add $(xauth -f ~xilinx/.Xauthority list|tail -1)
 sudo -i DISPLAY=$DISPLAY python3 $CURDIR/rfsoc-pydaq.py
-cd /home/xilinx/python

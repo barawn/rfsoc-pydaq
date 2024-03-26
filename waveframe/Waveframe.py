@@ -1,5 +1,3 @@
-##Effectively a backup because I want to move some things arround and the what not
-
 ##Python Imports
 import tkinter as tk
 from tkinter import ttk
@@ -27,7 +25,7 @@ class Waveframe(ttk.Notebook):
         
         super().__init__(parent)
         
-        ##I've re-orded this section so it is a lot easier to 
+        ##I've re-orded this section so it is a lot easier to add more figure if need be
         self.figs = {}
         self.canvs = {}
         
@@ -134,7 +132,7 @@ class Waveframe(ttk.Notebook):
 
         self.canvs['time'].draw()
         
-        ##Plotting additional plots
+        ##Plotting additional optional plots. These more than double the aqcuire time so making them optional is nice
         if toPlot[0]:
             self.plotFreq(data, title, Amp, Freq)
             
