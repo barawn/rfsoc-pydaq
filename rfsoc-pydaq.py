@@ -28,6 +28,11 @@ portNames = ["ADC224_T0_CH0 (LF)","ADC224_T0_CH1 (LF)","ADC225_T1_CH0 (HF)","ADC
 ##Allows it to be globally accessible
 theDaq = None
 
+##Things this needs
+#Save a waveform in some manner
+#Save the image of the waveform, This may want to enlarge the image first and then save
+#Enlarge a figure. I.e. allow it to be opened in a seperate window
+#
 
 #GUI classe(s)
 

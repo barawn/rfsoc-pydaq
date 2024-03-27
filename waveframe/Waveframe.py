@@ -25,9 +25,14 @@ class Waveframe(ttk.Notebook):
         
         super().__init__(parent)
         
+        ##Required otherwise it won't render due to the addition of buttons
+        self.notebook = ttk.Notebook(self)
+        self.notebook.pack(fill=tk.BOTH, expand=True)
+        
         ##I've re-orded this section so it is a lot easier to add more figure if need be
         self.figs = {}
         self.canvs = {}
+        self.btns = {}
         
         ##Set up the time figure
         self.td = ttk.Frame(self)
@@ -36,7 +41,7 @@ class Waveframe(ttk.Notebook):
                                                master=self.td)
         self.canvs['time'].draw()
         self.canvs['time'].get_tk_widget().pack()
-        self.add(self.td, text='Time')
+        self.notebook.add(self.td, text='Time')
         
         ##Set up the Fourier Transform Frequency Figure
         self.fd = ttk.Frame(self)
@@ -45,7 +50,7 @@ class Waveframe(ttk.Notebook):
                                                master=self.fd)
         self.canvs['freq'].draw()
         self.canvs['freq'].get_tk_widget().pack()
-        self.add(self.fd, text='Freq')
+        self.notebook.add(self.fd, text='Freq')
         
         ##Set up the fitted Waveform Figure
         self.ad = ttk.Frame(self)
@@ -54,7 +59,7 @@ class Waveframe(ttk.Notebook):
                                                master=self.ad)
         self.canvs['fit'].draw()
         self.canvs['fit'].get_tk_widget().pack()
-        self.add(self.ad, text='Fit')
+        self.notebook.add(self.ad, text='Fit')
         
         ##I don't know why this is here
         self.user = ttk.Frame(self)
@@ -63,7 +68,7 @@ class Waveframe(ttk.Notebook):
                                                master=self.user)
         self.canvs['user'].draw()
         self.canvs['user'].get_tk_widget().pack()
-        self.add(self.user, text='User')
+        self.notebook.add(self.user, text='User')
         
         #Template for adding new things
         
@@ -74,9 +79,30 @@ class Waveframe(ttk.Notebook):
         # self.canvs['new'].draw()
         # self.canvs['new'].get_tk_widget().pack()
         # self.add(self.new, text='New')
+
+
+        ##Buttons
+        self.btn_frame = ttk.Frame(self)
+        
+        self.btns['Save'] = ttk.Button(self.btn_frame, text="Run Process", command=self.Save)
+        self.btns['Save'].pack(side=tk.LEFT)
+        
+        self.btns['Enlarge'] = ttk.Button(self.btn_frame, text="Another Button", command=self.Enlarge)
+        self.btns['Enlarge'].pack(side=tk.LEFT)
+        
+        self.btn_frame.pack(side=tk.BOTTOM)
+        
+        self.pack(fill=tk.BOTH, expand=True)
         
         # Callback signature is data, figure, canvas
         self.user_callback = None
+        
+    ##Buttons
+    def Save(self):
+        return 'Nothing yet'
+    
+    def Enlarge(self):
+        return 'Nothing yet'
         
     def convertToMag(self, yf):
         N = len(yf)
