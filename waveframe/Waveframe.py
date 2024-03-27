@@ -1,6 +1,6 @@
 ##Python Imports
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, PhotoImage
 import numpy as np
 from scipy.fft import fft, ifft, fftfreq
 from scipy.constants import speed_of_light
@@ -8,6 +8,7 @@ from scipy.optimize import curve_fit
 
 #System Imports
 import logging
+# from PIL import Image
 
 #Plotting imports
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -84,10 +85,10 @@ class Waveframe(ttk.Notebook):
         ##Buttons
         self.btn_frame = ttk.Frame(self)
         
-        self.btns['Save'] = ttk.Button(self.btn_frame, text="Run Process", command=self.Save)
+        self.btns['Save'] = ttk.Button(self.btn_frame, text="Save", command=self.Save)
         self.btns['Save'].pack(side=tk.LEFT)
         
-        self.btns['Enlarge'] = ttk.Button(self.btn_frame, text="Another Button", command=self.Enlarge)
+        self.btns['Enlarge'] = ttk.Button(self.btn_frame, text="Enlarge", command=self.Enlarge)
         self.btns['Enlarge'].pack(side=tk.LEFT)
         
         self.btn_frame.pack(side=tk.BOTTOM)
@@ -99,8 +100,28 @@ class Waveframe(ttk.Notebook):
         
     ##Buttons
     def Save(self):
-        return 'Nothing yet'
-    
+        current_tab_index = self.notebook.index('current')
+        current_frame = self.notebook.nametowidget(self.notebook.tabs()[current_tab_index])
+        current_canvas = current_frame.winfo_children()[0]
+        
+        logging.debug(dir(current_canvas))
+        logging.debug(type(current_canvas))
+        
+        img = PhotoImage(file='"/home/xilinx/rfsoc-pydaq/figures/canvas_snapshot.png"')
+        canvas.create_image(250, 250, image=img)
+                
+                
+                
+        # ps = current_canvas.postscript(colormode='color')
+
+        # img = Image.open(io.BytesIO(ps.encode('utf-8')))
+
+        # img.save("/home/xilinx/rfsoc-pydaq/figures/canvas_snapshot.png")
+            
+        
+        # "/home/xilinx/rfsoc-pydaq/figures/canvas_snapshot.png"
+        logging.debug("Trying to save canvas")
+        
     def Enlarge(self):
         return 'Nothing yet'
         
