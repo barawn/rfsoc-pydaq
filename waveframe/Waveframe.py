@@ -5,10 +5,12 @@ import numpy as np
 from scipy.fft import fft, ifft, fftfreq
 from scipy.constants import speed_of_light
 from scipy.optimize import curve_fit
+import time
 
 #System Imports
 import logging
-# from PIL import Image
+from PIL import Image, ImageDraw
+import io
 
 #Plotting imports
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -23,6 +25,7 @@ class Waveframe(ttk.Notebook):
                  figsize=(3,2)):
         
         self.sampleRate = sampleRate
+        self.figsize = figsize
         
         super().__init__(parent)
         
@@ -100,26 +103,33 @@ class Waveframe(ttk.Notebook):
         
     ##Buttons
     def Save(self):
+        ##This gets the canvas on display
         current_tab_index = self.notebook.index('current')
         current_frame = self.notebook.nametowidget(self.notebook.tabs()[current_tab_index])
         current_canvas = current_frame.winfo_children()[0]
         
-        logging.debug(dir(current_canvas))
-        logging.debug(type(current_canvas))
+        filename = "/home/xilinx/rfsoc-pydaq/figures/canvas_snapshot.png"
         
-        img = PhotoImage(file='"/home/xilinx/rfsoc-pydaq/figures/canvas_snapshot.png"')
-        canvas.create_image(250, 250, image=img)
-                
-                
-                
-        # ps = current_canvas.postscript(colormode='color')
+        #This is because the canvas width is probably too small
+        width_multiplier = 3
+        height_multiplier = 1.5
+        quality = 6
+        original_width = current_canvas.winfo_width()
+        original_height = current_canvas.winfo_height()
+        current_canvas.config(width=original_width * width_multiplier, height = original_height * height_multiplier)
+        #Makes sure the canvas size is edited. Will edit on GUI as well until image saved
+        current_canvas.update()
 
-        # img = Image.open(io.BytesIO(ps.encode('utf-8')))
+        #Otherwise the image quality will be awful
+        #Pixels per inch (maybe) * better image quality * the relative size between width and height
+        ps = current_canvas.postscript(colormode='color', pagewidth=self.figsize[0]*72*6*width_multiplier, pageheight=self.figsize[1]*72*6*height_multiplier)
 
-        # img.save("/home/xilinx/rfsoc-pydaq/figures/canvas_snapshot.png")
-            
+        img = Image.open(io.BytesIO(ps.encode('utf-8')))
+        img.save(filename)
+                
+        #Returns the GUI to normal
+        current_canvas.config(width=original_width, height=original_height)
         
-        # "/home/xilinx/rfsoc-pydaq/figures/canvas_snapshot.png"
         logging.debug("Trying to save canvas")
         
     def Enlarge(self):
