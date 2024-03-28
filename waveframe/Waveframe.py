@@ -12,6 +12,8 @@ import logging
 from PIL import Image, ImageDraw
 import io
 
+logger = logging.getLogger(__name__)
+
 #Plotting imports
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk
@@ -21,13 +23,18 @@ from matplotlib.figure import Figure
 class Waveframe(ttk.Notebook):
     def __init__(self,
                  parent,
+                 index,
                  sampleRate=3.E9,
                  figsize=(3,2)):
         
+        self.parent = parent
         self.sampleRate = sampleRate
         self.figsize = figsize
+        self.index = index
         
         super().__init__(parent)
+        
+        self.original_index = 0
         
         ##Required otherwise it won't render due to the addition of buttons
         self.notebook = ttk.Notebook(self)
@@ -86,12 +93,12 @@ class Waveframe(ttk.Notebook):
 
 
         ##Buttons
-        self.btn_frame = ttk.Frame(self)
+        self.btn_frame = tk.Frame(self)
         
-        self.btns['Save'] = ttk.Button(self.btn_frame, text="Save", command=self.Save)
+        self.btns['Save'] = tk.Button(self.btn_frame, relief="raised", text="Save", command=self.Save)
         self.btns['Save'].pack(side=tk.LEFT)
         
-        self.btns['Enlarge'] = ttk.Button(self.btn_frame, text="Enlarge", command=self.Enlarge)
+        self.btns['Enlarge'] = tk.Button(self.btn_frame, relief="raised", text="Enlarge", command=self.Enlarge)
         self.btns['Enlarge'].pack(side=tk.LEFT)
         
         self.btn_frame.pack(side=tk.BOTTOM)
@@ -101,21 +108,46 @@ class Waveframe(ttk.Notebook):
         # Callback signature is data, figure, canvas
         self.user_callback = None
         
-    ##Buttons
-    def Save(self):
-        ##This gets the canvas on display
+    ##This gets the canvas on display
+    def getCanvas(self):
         current_tab_index = self.notebook.index('current')
         current_frame = self.notebook.nametowidget(self.notebook.tabs()[current_tab_index])
         current_canvas = current_frame.winfo_children()[0]
+        return current_canvas
+    
+    def getWidgets(self):
+        widgets = []
+        for widget in self.parent.winfo_children():
+            widgets.append(widget)
+        return widgets
+    
+    def orderWidgets(self, widgets=None):
+        if widgets is None:
+            widgets = self.getWidgets()
+        return sorted(widgets, key=lambda x: x.index)
+    
+    def orderThisWidget(self, widgets=None):
+        if widgets is None:
+            widgets = self.getWidgets()
+        for widget in widgets:
+            if widget.index == self.index:
+                widgets.remove(widget)
+                widgets.insert(0, widget)
+                break
+        return widgets
+        
+    ##Buttons
+    def Save(self):
+        current_canvas = self.getCanvas()
         
         filename = "/home/xilinx/rfsoc-pydaq/figures/canvas_snapshot.png"
         
-        #This is because the canvas width is probably too small
+        #This is because the canvas width is probably too small (and overal size might be too small as well to be fair)
         width_multiplier = 3
         height_multiplier = 1.5
         quality = 6
-        original_width = current_canvas.winfo_width()
-        original_height = current_canvas.winfo_height()
+        original_width = self.figsize[0]*100
+        original_height = self.figsize[1]*100
         current_canvas.config(width=original_width * width_multiplier, height = original_height * height_multiplier)
         #Makes sure the canvas size is edited. Will edit on GUI as well until image saved
         current_canvas.update()
@@ -130,10 +162,29 @@ class Waveframe(ttk.Notebook):
         #Returns the GUI to normal
         current_canvas.config(width=original_width, height=original_height)
         
-        logging.debug("Trying to save canvas")
+        logger.debug(f"Saved {filename}")
         
-    def Enlarge(self):
-        return 'Nothing yet'
+    def Enlarge(self):        
+        canvas = self.getCanvas()
+        print(f"Current widget index : {self.index}\n")
+        if self.btns['Enlarge'].config('relief')[-1] == 'sunken':
+            print("Reseting")
+            self.btns['Enlarge'].config(relief="raised")
+            for widget in self.orderWidgets():
+                print(f"Widget index : {widget.index}")
+                widget.pack(side="left")
+            canvas.config(width=self.figsize[0]*100, height = self.figsize[1]*100)
+        else:
+            print("Enlarging")
+            self.btns['Enlarge'].config(relief="sunken")
+            for widget in self.orderThisWidget():
+                print(f"Widget index : {widget.index}")
+                widget.pack(side="left")
+            canvas.config(width=1920, height = 800)
+            
+            
+        logger.debug("Updated the canvas size")
+        return 'Updated canvas size'   
         
     def convertToMag(self, yf):
         N = len(yf)

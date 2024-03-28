@@ -84,7 +84,7 @@ class RFSoC_Daq:
     def startWaveFrame(self):
         for i in range(self.numChannels):
             # print(self.plotFreq, self.plotFit)
-            thisWf = Waveframe(self.frame, self.sampleRate, self.figsize)
+            thisWf = Waveframe(self.frame, i, self.sampleRate, self.figsize)
             self.wf.append(thisWf)
             thisWf.pack(side = tk.LEFT )
     
@@ -300,7 +300,7 @@ def rfsocAcquire():
     
     for i in range(theDaq.numChannels):
         theDaq.wf[i].plot(theDaq.adcBuffer[i], portNames[i], theDaq.calcWave(i),[theDaq.plotFreq, theDaq.plotFit])
-    logger.debug("Aquired data")
+    logger.debug("Acquired data")
 
 
 ##Buttons
@@ -424,7 +424,7 @@ if __name__ == '__main__':
                                 text = "Load",
                                 command = rfsocLoad)
     buttons['Acquire'] = tk.Button(buttonFrame,
-                                   text = "Aqcuire",
+                                   text = "Acquire",
                                    command = rfsocAcquire)
     buttons['User'] = tk.Button(buttonFrame,
                                 text = "User",
