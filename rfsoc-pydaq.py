@@ -184,7 +184,7 @@ if __name__ == '__main__':
                                 text = "Load",
                                 command = rfsocLoad)
     buttons['Acquire'] = tk.Button(buttonFrame,
-                                   text = "Aqcuire",
+                                   text = "Acquire",
                                    command = rfsocAcquire)
     buttons['User'] = tk.Button(buttonFrame,
                                 text = "User",
