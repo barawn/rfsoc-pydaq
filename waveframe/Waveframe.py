@@ -41,11 +41,10 @@ class Waveframe(ttk.Notebook):
         
         super().__init__(self.parent)
         
-        ##Required otherwise it won't render due to the addition of buttons
+        ##Required issues with buttons otherwise
         self.notebook = ttk.Notebook(self)
         self.notebook.pack(fill=tk.BOTH, expand=True)
         
-        ##I've re-orded this section so it is a lot easier to add more figure if need be
         self.figs = {}
         self.canvs = {}
         self.btns = {}
@@ -96,7 +95,6 @@ class Waveframe(ttk.Notebook):
         # self.canvs['new'].get_tk_widget().pack()
         # self.add(self.new, text='New')
 
-
         ##Buttons for the waveform to record stuff and change the view.
         self.btn_frame = tk.Frame(self)
         
@@ -109,6 +107,7 @@ class Waveframe(ttk.Notebook):
         self.btns['Enlarge'] = tk.Button(self.btn_frame, relief="raised", text="Enlarge", command=self.enlargeButton)
         self.btns['Enlarge'].pack(side=tk.LEFT)
         
+        ##This is a toggle to plot the channels waveform or not
         self.btns['Plot'] = tk.Button(self.btn_frame, relief="raised", text="Plot?", command=self.plotButton)
         self.btns['Plot'].pack(side=tk.LEFT)
         
@@ -137,6 +136,18 @@ class Waveframe(ttk.Notebook):
         current_canvas = current_frame.winfo_children()[0]
         return current_canvas
     
+    def getNotebookCanvases(self):
+        other_canvases = []
+        for tab_index in range(self.notebook.index("end")):
+            tab = self.notebook.nametowidget(self.notebook.tabs()[tab_index])
+            canvas = tab.winfo_children()[0]  # Assuming canvas is the first widget
+            other_canvases.append(canvas)
+
+        current_canvas = self.getCanvas()
+        other_canvases.remove(current_canvas)
+
+        return other_canvases
+        
     ##This returns all the display frames (widgets) in the display frame
     def getWidgets(self):
         widgets = []
@@ -144,7 +155,7 @@ class Waveframe(ttk.Notebook):
             widgets.append(widget)
         return widgets
     
-    ##This orders all the widgets in the correct order, used for reseting the diplay frame
+    ##This orders all the widgets in the correct (original) order, used for reseting the diplay frame
     def orderWidgets(self, widgets=None):
         if widgets is None:
             widgets = self.getWidgets()
@@ -161,105 +172,102 @@ class Waveframe(ttk.Notebook):
                 break
         return widgets
     
-    ##Don't want the widgets saved within the class. Easiest to delete and whilst it is still stored in the frame add it. No in-built method to re-order.
     def packNew(self, widget):
         widget.pack_forget()
         widget.pack(side="left")
-        
-    def repack(self, widgets):
-        for widget in widgets:
-            widget.pack_forget()
-            widget.pack(side="left")
-    
-    def reset(self):
-        return 'Reset'
+        logger.debug(f"Widget {widget} has been re-packed")
     
     ##Resets the frame to the original position
     def resetFrame(self):
         for widget in self.orderWidgets():
             self.packNew(widget)
             widget.setPlot(True)
+        logger.debug("Frames returned to original")
         return 'Frames Re-ordered'        
 
     ##Buttons
-    def saveWF(self):
-        directory = "/home/xilinx/rfsoc-pydaq/data/"
-
-        # This needs a better automatic file name system
-        fileName = self.title + "_" + datetime.now().strftime("%H-%M-%S_%d-%m-%Y") + ".csv"
+    def saveName(self, Figure=False):
+        #Needs better automatic naming system
+        directory = "/home/xilinx/rfsoc-pydaq/"
+        fileName = ""
+        if Figure:
+            fileName = "figures/" + self.title + "_" + datetime.now().strftime("%H-%M-%S_%d-%m-%Y") + ".png"
+        else:
+            fileName = "data/" + self.title + "_" + datetime.now().strftime("%H-%M-%S_%d-%m-%Y") + ".csv"
         path = directory+fileName
+        logger.debug(f"Saving file to {path}")
+        return path
+    
+    def saveWF(self):
+        path = self.saveName(False)
         
         data = list(zip(np.arange(len(self.waveForm))/self.sampleRate, self.waveForm))
         
         with open(path, mode='w', newline='') as file:
             writer = csv.writer(file)
-            writer.writerows(data)        
-        return 'Maybe completed'
+            writer.writerows(data)  
+        logger.debug("Waveform data saved")
+        return 'Saved Waveform'
     
     def SavePlt(self):
         current_canvas = self.getCanvas()
         
         if self.enlarged == False:
             self.Enlarge(current_canvas)
-            
-        directory = "/home/xilinx/rfsoc-pydaq/figures/"
-        file = "canvas_snapshot.png"
-        filename = directory+file
+
+        path = self.saveName(True)
         
-        #This is because the canvas width is probably too small (and overal size might be too small as well to be fair)
-        width_multiplier = 3
-        height_multiplier = 1.5
         quality = 6
-        original_width = self.figsize[0]*100
-        original_height = self.figsize[1]*100
-        # current_canvas.config(width=original_width * width_multiplier, height = original_height * height_multiplier)
-        # current_canvas.config(width=1920, height = 800)
-        
+
         #Makes sure the canvas size is edited. Will edit on GUI as well until image saved
         current_canvas.update()
 
-        #Otherwise the image quality will be awful
-        #Pixels per inch (maybe) * better image quality * the relative size between width and height
-        ps = current_canvas.postscript(colormode='color', pagewidth=self.figsize[0]*72*quality*width_multiplier, pageheight=self.figsize[1]*72*quality*height_multiplier)
+        ps = current_canvas.postscript(colormode='color', pagewidth=1917*quality, pageheight=800*quality)
 
         img = Image.open(io.BytesIO(ps.encode('utf-8')))
-        img.save(filename)
+        img.save(path)
                 
-        #Returns the GUI to normal. As long as this may or may not take (and also essential that this happens) it is also a clear indicator that the file has been saved when it resumes to normal
-        current_canvas.config(width=original_width, height=original_height)
+        # current_canvas.config(width=original_width, height=original_height)
         
         self.Shrink(current_canvas)
         self.resetFrame()
         
-        logger.debug(f"Saved plot as {filename}")
-        
+        logger.debug(f"Saved plot as {path}")
         
     def Shrink(self, canvas):
+        canvas.config(width=self.figsize[0]*100, height = self.figsize[1]*100)
         self.btns['Enlarge'].config(relief="raised")
         self.resetFrame()
-        canvas.config(width=self.figsize[0]*100, height = self.figsize[1]*100)
         self.enlarged = False
+        
+    def ShrinkNotebook(self):
+        for canvas in self.getNotebookCanvases():
+            canvas.config(width=self.figsize[0]*100, height = self.figsize[1]*100)
     
     def Enlarge(self, canvas):
         self.btns['Enlarge'].config(relief="sunken")
         for widget in self.orderThisWidget():
-            print(f"Widget index : {widget.index}")
             self.packNew(widget)
-            
-        canvas.config(width=1920, height = 800)
+        ##My Display isn't going to 1920 for some reason
+        canvas.config(width = 1917 , height = 800)
         self.enlarged = True
+        
+    def EnlargeNoteBook(self):
+        for canvas in self.getNotebookCanvases():
+            canvas.config(width = 1917 , height = 800)        
         
     def enlargeButton(self):        
         canvas = self.getCanvas()
-        print(f"Current widget index : {self.index}\n")
         if self.btns['Enlarge'].config('relief')[-1] == 'sunken':
             print("Reseting")
+            self.ShrinkNotebook()
             self.Shrink(canvas)
             for widget in self.parent.winfo_children():
                 widget.setPlot(True)
         else:
             print("Enlarging")
             self.Enlarge(canvas)
+            self.EnlargeNoteBook()
             for widget in self.parent.winfo_children():
                 if widget.index != self.index:
                     widget.setPlot(False)
@@ -274,7 +282,6 @@ class Waveframe(ttk.Notebook):
         else:
             self.btns['Plot'].config(relief="sunken")
             
-    
     def plotButton(self):        
         if self.btns['Plot'].config('relief')[-1] == 'sunken':
             self.btns['Plot'].config(relief="raised")
@@ -313,9 +320,8 @@ class Waveframe(ttk.Notebook):
         phase=parameter[2]
         return omega,freq,amp,phase
         
-        
-    def plot(self, data, title, Wave, toPlot):#, Amp, Freq):
-        self.setWaveform(data)
+    def plot(self, Wave, toPlot):#, Amp, Freq):
+        # self.setWaveform(data)
         Amp = Wave[0]
         Freq = Wave[1]
         Phase = Wave[2]
@@ -326,45 +332,29 @@ class Waveframe(ttk.Notebook):
         self.figs['user'].clear()
         # we want this in nanoseconds, so divide samplerate by 1E9
         samplePeriod = 1.E9/self.sampleRate
-        xaxis = np.arange(len(data))*samplePeriod
+        xaxis = np.arange(len(self.waveForm))*samplePeriod
         
-        
-        self.plotWaveForm(data, xaxis, title, Amp, Freq, Phase)
-        
-        # ax = self.figs['time'].add_subplot(111)
-        # ax.plot(xaxis, data)
-        # ax.set_title(title)
-        # ax.set_xlabel('time (ns)')
-        # ax.set_ylabel('ADC Counts', labelpad=-3.5)
-        
-        # ax.axhline(y=0, color='black', linestyle='--', linewidth=0.5, label='Zero Line')
-        # ax.axhline(y=Amp, color='black', linestyle='--', linewidth=0.3, label='Amplitude Line')
-        
-        # stats_text = f"Amplitude: {Amp:.2f} Counts\nFrequency: {(Freq/10**6):.2f} MHz\nPhase: {Phase:.2f} radians"
-        # ax.text(0.95, 0.95, stats_text, verticalalignment='top', horizontalalignment='right',
-        #     transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.5))
-
-        # self.canvs['time'].draw()
+        self.plotWaveForm(xaxis, Amp, Freq, Phase)
         
         ##Plotting additional optional plots. These more than double the aqcuire time so making them optional is nice
         if toPlot[0]:
-            self.plotFreq(data, title, Amp, Freq)
+            self.plotFreq(Amp, Freq)
             
         if toPlot[1]:
-            self.plotFit(data, title, xaxis, Amp, Freq, Phase)
+            self.plotFit(xaxis, Amp, Freq, Phase)
 
         if callable(self.user_callback):
             try:
-                self.user_callback(data,
+                self.user_callback(self.waveForm,
                                    self.figs['user'],
                                    self.canvs['user'])
             except TypeError:
                 logging.error("user_callback '%s' type error: check arguments (data, fig, canvas)" % self.user_callback.__name__)        
 
-    def plotWaveForm(self, data, xaxis, title, Amp, Freq, Phase):
+    def plotWaveForm(self, xaxis, Amp, Freq, Phase):
         ax = self.figs['time'].add_subplot(111)
-        ax.plot(xaxis, data)
-        ax.set_title(title)
+        ax.plot(xaxis, self.waveForm)
+        ax.set_title(self.title)
         ax.set_xlabel('time (ns)')
         ax.set_ylabel('ADC Counts', labelpad=-3.5)
         
@@ -378,16 +368,16 @@ class Waveframe(ttk.Notebook):
         self.canvs['time'].draw()
 
     ##Additional plots
-    def plotFreq(self, data, title, Amp, Freq):
-        scipy_fft = fft(data)
+    def plotFreq(self, Amp, Freq):
+        scipy_fft = fft(self.waveForm)
         
-        xf = np.linspace(0.0, 1.0/(2.0/self.sampleRate), len(data)//2)/(10**6)
+        xf = np.linspace(0.0, 1.0/(2.0/self.sampleRate), len(self.waveForm)//2)/(10**6)
         
         axFreq = self.figs['freq'].add_subplot(111)
         
         axFreq.plot(xf, self.convertToMag(scipy_fft), label='scipy')
         
-        axFreq.set_title(title)
+        axFreq.set_title(self.title)
         axFreq.set_xlabel("Frequency (MHz)")
         axFreq.set_ylabel("Magnitude (arb.)")
         
@@ -399,14 +389,14 @@ class Waveframe(ttk.Notebook):
         self.canvs['freq'].draw()
         return 'Plotted frequency'
     
-    def plotFit(self, data, title, xaxis, Amp, Freq, Phi):
+    def plotFit(self, xaxis, Amp, Freq, Phi):
         
-        Omega,Frequency,Amplitude,Phase=self.doSineWaveFit(data, Amp, Freq, Phi)
+        Omega,Frequency,Amplitude,Phase=self.doSineWaveFit(self.waveForm, Amp, Freq, Phi)
                         
         axFit = self.figs['fit'].add_subplot(111)
-        axFit.plot(xaxis, data, label='Data')
+        axFit.plot(xaxis, self.waveForm, label='Data')
         axFit.plot(xaxis, self.getSine(xaxis,Omega,Amplitude,Phase), label='Fit')
-        axFit.set_title(title)
+        axFit.set_title(self.title)
         axFit.set_xlabel('time (ns)')
         axFit.set_ylabel('ADC Counts', labelpad=-3.5)
         

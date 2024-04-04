@@ -31,11 +31,7 @@ portNames = ["ADC224_T0_CH0 (LF)","ADC224_T0_CH1 (LF)","ADC225_T1_CH0 (HF)","ADC
 ##Allows it to be globally accessible
 theDaq = None
 
-##Things this needs
-#Save a waveform in some manner
-#Save the image of the waveform, This may want to enlarge the image first and then save. Done
-#Enlarge a figure. I.e. allow it to be opened in a seperate window. I have elected to simply enlarge it in window since its a pain to update the window. It's also an effing pain enlarging the canvas but hey ho
-#Maybe add a 'continous' waveform 'generator'. I.e. every 10 seconds it runs aqcuire
+#Maybe add a 'continous' waveform 'generator'. I.e. every 10 seconds it runs acquire
 
 #GUI classe(s)
 
@@ -81,15 +77,15 @@ class RFSoC_Daq:
         self.plotFreq = True
         self.plotFit = True
         self.wf = []
-        #Made this a method so I could reset it from mainloop
+
         self.startWaveFrame()
         
     def startWaveFrame(self):
         for i in range(self.numChannels):
-            # print(self.plotFreq, self.plotFit)
             thisWf = Waveframe(self.frame, i, portNames[i].split()[0], self.sampleRate, self.figsize)
             self.wf.append(thisWf)
             thisWf.pack(side = tk.LEFT )
+            logger.debug(f"Waveframe {i} has been made")
     
     ##Sets
     def setNumChannels(self, Channels = 4):
@@ -97,6 +93,7 @@ class RFSoC_Daq:
         ##This needs to be edited
         ##to gather what frames have been plotted and what frames need to be added or removed
         ##and update the display frame accordingly. Will probably involve repacking
+        ##Or changing the figure size
         
         logger.debug(f"You will now record {self.numChannels} channels")
         return f"You will now record {self.numChannels} channels"
@@ -106,26 +103,25 @@ class RFSoC_Daq:
         return f"You will now take {self.numSamples} samples"
     def setSampleRate(self, rate = 3*10**9):
         self.sampleRate = rate
-        for waveFrame in self.wf
+        for waveFrame in self.wf:
             waveFrame.sampleRate = rate
         logger.debug(f"Sample rate is now {self.sampleRate/10**9} GSPS")
         return f"Sample rate is now {self.sampleRate/10**9} GSPS"
-    def setFigSize(self, sizing = (3,2)):
-        self.figsize = sizing
-        logger.debug(f"The figure size is now {self.figsize}")
-        return f"The figure size is now {self.figsize}"
+    def setFigSize(self, sizing = [3,2]):
+        if isinstance(sizing, list):
+            self.figsize = sizing
+            logger.debug(f"The figure size is now {self.figsize}")
+            return f"The figure size is now {self.figsize}"
+        else:
+            logger.debug("Not an appropriate input, please input an list")
+            return 'Not an appropriate input, please input an list'
     def setAdcBuffer(self):
         self.adcBuffer = np.zeros( (theDaq.numChannels, theDaq.numSamples), np.int16 )
-        logger.debug("The adcBuffer has hopefully been updated")
+        logger.debug("The adcBuffer has been updated")
         return 'adcBuffer Updated'
-    def setWaveFrame(self):
-        self.startWaveFrame()
-        logger.debug("Waveframe should be updated")
-        return 'WaveFrame Updated'
     def setPlotFreq(self, Value=True):
         if isinstance(Value, bool):
             self.plotFreq = Value
-            # self.setWaveFrame()
             logger.debug(f"{'Plotting' if Value else 'Not plotting'} the frequency")
             return f"{'Plotting' if Value else 'Not plotting'} the frequency"
         else:
@@ -134,7 +130,6 @@ class RFSoC_Daq:
     def setPlotFit(self, Value=True):
         if isinstance(Value, bool):
             self.plotFit = Value
-            # self.setWaveFrame()
             logger.debug(f"{'Plotting' if Value else 'Not plotting'} the fitted curve")
             return f"{'Plotting' if Value else 'Not plotting'} the fitted curve"
         else:
@@ -148,10 +143,10 @@ class RFSoC_Daq:
     def getNumSamples(self):
         logger.debug(f"You are taking {self.numSamples} channels")
         return self.numSamples
-    def getNumSamples(self):
+    def getSampleRate(self):
         logger.debug(f"You are recording {self.sampleRate/10**9} GSPS")
         return self.sampleRate
-    def getNumSamples(self):
+    def getFigSize(self):
         logger.debug(f"You displaying figures on a {self.figsize} grid")
         return self.figsize
     def getAdcBuffer(self):
@@ -171,7 +166,6 @@ class RFSoC_Daq:
         N = len(yf)
         return 2.0/N * np.abs(yf[0:N//2])
     
-    ##Maybe make amp and freq into one method since they basically run the same processes
     def calcWave(self, Ch=0):
         if isinstance(Ch, int) and 0 <= Ch < self.numChannels:
             signal = self.adcBuffer[Ch]
@@ -186,12 +180,12 @@ class RFSoC_Daq:
             frequency = xf[peak_freq_index]
             amplitude = mag_spectrum[peak_freq_index] * 2 / N
             phase = phase_spectrum[peak_freq_index]
-            logging.debug(f"Amplitude: {amplitude:.3f} ADC counts || Frequency: {(frequency/10**6):.3f} MHz || Phase: {phase:.3f} rad || Channel: {Ch}")
+            # logging.debug(f"Amplitude: {amplitude:.3f} ADC counts || Frequency: {(frequency/10**6):.3f} MHz || Phase: {phase:.3f} rad || Channel: {Ch}")
             return amplitude, frequency, phase
         else:
             raise ValueError('Not an available channel')
         
-    def getWL(self, Ch=0):
+    def calcWL(self, Ch=0):
         if isinstance(Ch, int) and 0<=Ch<self.numChannels:
             wavelength = speed_of_light/self.calcWave(Ch)[1]
             logging.debug(f"Wavelength : {wavelength} of Channel : {Ch}")
@@ -213,16 +207,15 @@ class RFSoC_Daq:
         
     def printWavelength(self, Ch=-1):
         if isinstance(Ch, int) and 0<=Ch<self.numChannels:
-            wavelength = getWL(Ch)
+            wavelength = calcWL(Ch)
             print(f"Wavelength : {wavelength} metres || Channel : {Ch}")
         elif Ch==-1:
             for i in range(self.numChannels):
-                wavelength = getWL(Ch)
+                wavelength = calcWL(Ch)
                 print(f"Channel {i} : Wavelength : {wavelength} metres")
         else:
             return 'Not an available channel'
 
-##Not sure why this exists but hey ho
 def defaultUserCommand():
     return
 
@@ -299,7 +292,6 @@ def rfsocLoad(hardware = ""):
     os.chdir(curdir)
     return
 
-
 def rfsocAcquire():
     if theDaq.dev is None:
         logger.error("No RFSoC device is loaded!")
@@ -308,22 +300,17 @@ def rfsocAcquire():
                                 theDaq.numChannels)
     
     for i in range(theDaq.numChannels):
-        ##Could have a toggle on channels getting data
-        ##if so would probably do
+        theDaq.wf[i].setWaveform(theDaq.adcBuffer[i])
         if theDaq.wf[i].toPlot == True:
-            theDaq.wf[i].plot(theDaq.adcBuffer[i], portNames[i], theDaq.calcWave(i),[theDaq.plotFreq, theDaq.plotFit])
-        theDaq.wf[i].waveForm = theDaq.adcBuffer[i]
+            theDaq.wf[i].plot(theDaq.calcWave(i), [theDaq.plotFreq, theDaq.plotFit])
+            
     logger.debug("Acquired data")
     
-def ContRfsocAcquire():
-    ##Since certain data aqcuisition may take 10 or more seconds make the wait between  rfsocAcquire roughly 10 seconds.
-    ##Wait... Is this going to be run continously. How we get a background progress that runs rfsocAcquire every 10 seconds.
-    ##This is probably going to have to be a toggle of some manner
-    ##This is going to be more complicated than I thought
+def ContAcquire():
     return 'Not complete'
 
-
 ##Buttons
+##Simply retrieves the value from an input 'entry' box connected to a submit button
 def getSubmitInput(value):
     if isinstance(value, object):
         logger.debug("Passed in an object, attempting to .entry.get()")
@@ -359,6 +346,7 @@ def submitSampleRate(value = 3*10**9):
     
 def submitNumberOfChannels(value = 4):
     Channels = getSubmitInput(value)
+    ##Something probably needs to happen here but this whole method is somewhat pointless
     logger.debug(f"Currently have {theDaq.numChannels} samples, you have inputted {Channels} samples")
     
     if isinstance(Channels, int) and 0<Channels<=8:
@@ -378,12 +366,10 @@ def toggle(tg, setFunc):
         setFunc(False)
     return 'Updated plotting'
 
-def contAqcuire():
+def contAcquire():
     toggle()
 
 ##Miscellaneous
-##This should return an appropriate figure size such that full screen width should be fully occupied
-##This should be used if one wants to change the number of channels in use and shall adjust the figure size accordingly. However that feature doesn't yet work so you know
 def getAppropriateFigSize():
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
@@ -401,7 +387,7 @@ def reload_script():
     else:
         logger.debug(f"Module '{main_script}' not found in sys.modules")
         
-##This just a slider that can be ignored
+##This just a method for a slider that can be ignored
 def degis(value):
     global buton
     if(value == "1"):
@@ -415,7 +401,9 @@ if __name__ == '__main__':
     
     screen_width = root.winfo_screenwidth() * sizeEditor[0]
     screen_height = root.winfo_screenheight() * sizeEditor[1]
-    figsize=(screen_width/(100*numChannels), screen_height/250)
+    # figsize=(screen_width/(100*numChannels), screen_height/250)
+    ##My Display appears to be not using the full 1920 width
+    figsize = (4.77, 4.32)
     
     logging.basicConfig(level=logging.DEBUG)
     displayFrame = tk.Frame(master = root,
@@ -424,11 +412,9 @@ if __name__ == '__main__':
     buttonFrame = tk.Frame(master = root,
                            relief = tk.RAISED,
                            borderwidth = 1)
-    ##Added a frame for the toggle buttons
     toggleFrame = tk.Frame(master = root,
                            relief = tk.RAISED,
                            borderwidth = 1)
-    ##Added a frame for submit buttons
     submitFrame = tk.Frame(master = root,
                            relief = tk.RAISED,
                            borderwidth = 1)
@@ -455,8 +441,8 @@ if __name__ == '__main__':
     buttons['Acquire'] = tk.Button(buttonFrame,
                                    text = "Acquire",
                                    command = rfsocAcquire)
-    buttons['ContAqcuire'] = tk.Button(buttonFrame,
-                                   text = "ContAqcuire",
+    buttons['ContAcquire'] = tk.Button(buttonFrame,
+                                   text = "ContAcquire",
                                    command = defaultUserCommand)
     buttons['User'] = tk.Button(buttonFrame,
                                 text = "User",
@@ -495,7 +481,6 @@ if __name__ == '__main__':
     
     toggleFrame.pack( side = tk.TOP )
     
-    
     ##Most of these don't do anything important. But it's nice that the submit button infrasturctture is there
     buttons['SetSampleSize'] = submitButton(root, submitFrame, "Set Sample Number (exponent of 2):", sampleExponent, lambda: submitNumSamples(buttons['SetSampleSize']))
     buttons['SetSampleRate'] = submitButton(root, submitFrame, "Set Sample Rate (Redundant):", sampleRate, lambda: submitSampleRate(buttons['SetSampleRate']))
@@ -503,7 +488,6 @@ if __name__ == '__main__':
     
     submitFrame.pack( side = tk.TOP )
 
-    ##Don't know why it wasn't theDaq in the first place. If there was a good reason for this...
     locals = { 'daq' : theDaq,
                'buttons' : buttons }
     console = TextConsole( consoleFrame,
@@ -511,12 +495,10 @@ if __name__ == '__main__':
     console.pack(fill='both', expand=True)
     consoleFrame.pack( fill='both', expand=True, side = tk.TOP )
 
-
     log = ScrolledLog( logFrame, logger )
     log.pack(fill='x', expand=True)
     logFrame.pack( fill='x', side = tk.TOP )
     
-    ##This automatically loads the zcumts overlay since what other overlay would I load. Also it was a right pain having to go through the file directory from the root directory.
     rfsocLoad(hardware = "zcumts")
         
     root.mainloop()
