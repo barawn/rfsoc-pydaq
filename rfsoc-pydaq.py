@@ -23,16 +23,19 @@ numSamples = 2**sampleExponent#2**12#2**11
 sampleRate = 3.E9
 figsize = (3,2)
 
-portNames = ["ADC224_T0_CH0 (LF)","ADC224_T0_CH1 (LF)","ADC225_T1_CH0 (HF)","ADC225_T1_CH1 (HF)","","","",""]
+##Not all screens are so accomadating to this quick change
+sizeEditor = (1, 1)
+
+portNames = ["ADC224_T0_CH0 (LF)","ADC224_T0_CH1 (LF)","ADC225_T1_CH0 (HF)","ADC225_T1_CH1 (HF)","Port_5","Port_6","Port_7"," Port_8"]
 
 ##Allows it to be globally accessible
 theDaq = None
 
 ##Things this needs
 #Save a waveform in some manner
-#Save the image of the waveform, This may want to enlarge the image first and then save
-#Enlarge a figure. I.e. allow it to be opened in a seperate window
-#
+#Save the image of the waveform, This may want to enlarge the image first and then save. Done
+#Enlarge a figure. I.e. allow it to be opened in a seperate window. I have elected to simply enlarge it in window since its a pain to update the window. It's also an effing pain enlarging the canvas but hey ho
+#Maybe add a 'continous' waveform 'generator'. I.e. every 10 seconds it runs aqcuire
 
 #GUI classe(s)
 
@@ -84,13 +87,17 @@ class RFSoC_Daq:
     def startWaveFrame(self):
         for i in range(self.numChannels):
             # print(self.plotFreq, self.plotFit)
-            thisWf = Waveframe(self.frame, i, self.sampleRate, self.figsize)
+            thisWf = Waveframe(self.frame, i, portNames[i].split()[0], self.sampleRate, self.figsize)
             self.wf.append(thisWf)
             thisWf.pack(side = tk.LEFT )
     
     ##Sets
     def setNumChannels(self, Channels = 4):
         self.numChannels = Channels
+        ##This needs to be edited
+        ##to gather what frames have been plotted and what frames need to be added or removed
+        ##and update the display frame accordingly. Will probably involve repacking
+        
         logger.debug(f"You will now record {self.numChannels} channels")
         return f"You will now record {self.numChannels} channels"
     def setNumSamples(self, NSum = 2**11):
@@ -99,6 +106,8 @@ class RFSoC_Daq:
         return f"You will now take {self.numSamples} samples"
     def setSampleRate(self, rate = 3*10**9):
         self.sampleRate = rate
+        for waveFrame in self.wf
+            waveFrame.sampleRate = rate
         logger.debug(f"Sample rate is now {self.sampleRate/10**9} GSPS")
         return f"Sample rate is now {self.sampleRate/10**9} GSPS"
     def setFigSize(self, sizing = (3,2)):
@@ -116,7 +125,7 @@ class RFSoC_Daq:
     def setPlotFreq(self, Value=True):
         if isinstance(Value, bool):
             self.plotFreq = Value
-            self.setWaveFrame()
+            # self.setWaveFrame()
             logger.debug(f"{'Plotting' if Value else 'Not plotting'} the frequency")
             return f"{'Plotting' if Value else 'Not plotting'} the frequency"
         else:
@@ -125,7 +134,7 @@ class RFSoC_Daq:
     def setPlotFit(self, Value=True):
         if isinstance(Value, bool):
             self.plotFit = Value
-            self.setWaveFrame()
+            # self.setWaveFrame()
             logger.debug(f"{'Plotting' if Value else 'Not plotting'} the fitted curve")
             return f"{'Plotting' if Value else 'Not plotting'} the fitted curve"
         else:
@@ -299,8 +308,19 @@ def rfsocAcquire():
                                 theDaq.numChannels)
     
     for i in range(theDaq.numChannels):
-        theDaq.wf[i].plot(theDaq.adcBuffer[i], portNames[i], theDaq.calcWave(i),[theDaq.plotFreq, theDaq.plotFit])
+        ##Could have a toggle on channels getting data
+        ##if so would probably do
+        if theDaq.wf[i].toPlot == True:
+            theDaq.wf[i].plot(theDaq.adcBuffer[i], portNames[i], theDaq.calcWave(i),[theDaq.plotFreq, theDaq.plotFit])
+        theDaq.wf[i].waveForm = theDaq.adcBuffer[i]
     logger.debug("Acquired data")
+    
+def ContRfsocAcquire():
+    ##Since certain data aqcuisition may take 10 or more seconds make the wait between  rfsocAcquire roughly 10 seconds.
+    ##Wait... Is this going to be run continously. How we get a background progress that runs rfsocAcquire every 10 seconds.
+    ##This is probably going to have to be a toggle of some manner
+    ##This is going to be more complicated than I thought
+    return 'Not complete'
 
 
 ##Buttons
@@ -332,7 +352,6 @@ def submitSampleRate(value = 3*10**9):
     
     if rate>=10**5:
         theDaq.setSampleRate(rate)
-        theDaq.setWaveFrame()
         return f"You will now take {theDaq.sampleRate} GSPS"
     else:
         logger.debug("Please input an appropriate Sample Rate")
@@ -344,7 +363,6 @@ def submitNumberOfChannels(value = 4):
     
     if isinstance(Channels, int) and 0<Channels<=8:
         theDaq.setNumChannels(Channels)
-        theDaq.setWaveFrame()
         return f"You will now have {theDaq.numChannels} Channels"
     else:
         logger.debug("Please input an appropriate number of channels")
@@ -358,7 +376,10 @@ def toggle(tg, setFunc):
     else:
         tg.config(relief="sunken")
         setFunc(False)
-    return 'Updated plotting'   
+    return 'Updated plotting'
+
+def contAqcuire():
+    toggle()
 
 ##Miscellaneous
 ##This should return an appropriate figure size such that full screen width should be fully occupied
@@ -380,13 +401,21 @@ def reload_script():
     else:
         logger.debug(f"Module '{main_script}' not found in sys.modules")
         
+##This just a slider that can be ignored
+def degis(value):
+    global buton
+    if(value == "1"):
+        buton["label"] = "  On"
+    else:
+        buton["label"] = "  Off"
+        
         
 if __name__ == '__main__':
     root = tk.Tk()
     
-    screen_width = root.winfo_screenwidth()
-    screen_height = root.winfo_screenheight()
-    figsize=(screen_width/(100*numChannels),screen_height/250)
+    screen_width = root.winfo_screenwidth() * sizeEditor[0]
+    screen_height = root.winfo_screenheight() * sizeEditor[1]
+    figsize=(screen_width/(100*numChannels), screen_height/250)
     
     logging.basicConfig(level=logging.DEBUG)
     displayFrame = tk.Frame(master = root,
@@ -426,6 +455,9 @@ if __name__ == '__main__':
     buttons['Acquire'] = tk.Button(buttonFrame,
                                    text = "Acquire",
                                    command = rfsocAcquire)
+    buttons['ContAqcuire'] = tk.Button(buttonFrame,
+                                   text = "ContAqcuire",
+                                   command = defaultUserCommand)
     buttons['User'] = tk.Button(buttonFrame,
                                 text = "User",
                                 command = defaultUserCommand)
@@ -439,9 +471,12 @@ if __name__ == '__main__':
     buttons['Acquire'].pack( side = tk.LEFT )
     buttons['User'].pack( side = tk.LEFT )
     buttons['Reset'].pack( side = tk.LEFT )
+
+    #A slider that works (as a piece of GUI) but don't have a use for currently
+    # buton = tk.Scale(orient = tk.HORIZONTAL,length = 50,to = 1,showvalue = False,sliderlength = 25,label = "  Off",command = degis)
+    # buton.pack()
     
     buttonFrame.pack( side = tk.TOP )
-    
     
     toggles = {}
     toggles["Freq"] = tk.Button(toggleFrame,

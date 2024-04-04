@@ -27,7 +27,7 @@ class TextConsole(tk.Text):
     # in the shell.
     def __init__(self, master, locals, **kw):
         # 8 lines default
-        kw.setdefault('height', 8)
+        kw.setdefault('height', 5)
         kw.setdefault('wrap', 'word')
         kw.setdefault('prompt1', '>>> ')
         kw.setdefault('prompt2', '...')
