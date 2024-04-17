@@ -47,3 +47,28 @@ embedded into a Python module yet.
 
 * A tabbed plotting canvas (in progress)
 
+## Stuff I added
+
+![Screenshot of RFSoC-PyDaq Running](https://github.com/pueo-pynq/rfsoc-pydaq/blob/Hugo/pydaqimage.png)
+
+DisplayFrame:
+* Notebooks can plot the raw wavefrom but also the frequency fft and very rudamentary fitted plot (looks worse in photo due to putting low frequency through high frequency balun, so small signal).
+* The plots have labels, legends and potentially stats boxes.
+* Each Notebook comes with 4 buttons. SaveWF saves the data to a csv file, SavePlt saves the canvas (very slow in TKinter, this enlarges the frame and then resets), Enlarge is a toggle that enlarges the specified Notebook and blocks other canvases from plotting and 'Plot?' toggles whether the notebook plots.
+
+buttonFrame:
+* No real change but now automatically loads in zcuMTS.
+
+toggleFrame:
+* This toggles whether the frequency fft and Fitted curve should be plotted, these can ~double the Acquire time.
+
+submitFrame:
+* You can change the sample size, only exponents of two since a lot of different inputs of 2 lead to pretty hard crashes (max 14). Don't know why but odd exponents seem to work better.
+* Set the file name to save to. Files are saved automatically starting with the full channel name. Afterwards either the date horribly formatted or whatever is typed here. If this is falsey it will go back to the awkward time naming. This name will be for all Notebooks
+* Can now press enter to submit the field 
+
+consoleFrame:
+* A few new built in methods in the RFSoC_Daq can be accessed here. Most useful ones are automatically run for display
+
+logFrame:
+* Many new features will give a log output but some will only do this in the terminal you run ./run-rfsoc-pydaq.sh

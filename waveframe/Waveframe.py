@@ -38,6 +38,7 @@ class Waveframe(ttk.Notebook):
         self.toPlot = True
         self.enlarged = False
         self.waveForm = 0
+        self.saveText = None
         
         super().__init__(self.parent)
         
@@ -186,24 +187,24 @@ class Waveframe(ttk.Notebook):
         return 'Frames Re-ordered'        
 
     ##Buttons
-    def saveName(self, Figure=False):
+    def saveName(self, subdir, fileType):
         #Needs better automatic naming system
         directory = "/home/xilinx/rfsoc-pydaq/"
         fileName = ""
-        if Figure:
-            fileName = "figures/" + self.title + "_" + datetime.now().strftime("%H-%M-%S_%d-%m-%Y") + ".png"
+        if self.saveText:
+            fileName = subdir + self.title + "_" + self.saveText + fileType
         else:
-            fileName = "data/" + self.title + "_" + datetime.now().strftime("%H-%M-%S_%d-%m-%Y") + ".csv"
+            fileName = subdir + self.title + "_" + datetime.now().strftime("%H-%M-%S_%d-%m-%Y") + fileType
         path = directory+fileName
         logger.debug(f"Saving file to {path}")
         return path
     
     def saveWF(self):
-        path = self.saveName(False)
+        path = self.saveName("data/", ".csv")
         
         data = list(zip(np.arange(len(self.waveForm))/self.sampleRate, self.waveForm))
         
-        with open(path, mode='w', newline='') as file:
+        with open(path, mode='a', newline='') as file: #mode='w'
             writer = csv.writer(file)
             writer.writerows(data)  
         logger.debug("Waveform data saved")
@@ -215,14 +216,14 @@ class Waveframe(ttk.Notebook):
         if self.enlarged == False:
             self.Enlarge(current_canvas)
 
-        path = self.saveName(True)
+        path = self.saveName("figures/", ".png")
         
-        quality = 6
+        quality = 2
 
         #Makes sure the canvas size is edited. Will edit on GUI as well until image saved
         current_canvas.update()
 
-        ps = current_canvas.postscript(colormode='color', pagewidth=1917*quality, pageheight=800*quality)
+        ps = current_canvas.postscript(colormode='color', pagewidth=self.figsize[0]*400*quality, pageheight=self.figsize[1]*180*quality)
 
         img = Image.open(io.BytesIO(ps.encode('utf-8')))
         img.save(path)
@@ -249,12 +250,12 @@ class Waveframe(ttk.Notebook):
         for widget in self.orderThisWidget():
             self.packNew(widget)
         ##My Display isn't going to 1920 for some reason
-        canvas.config(width = 1917 , height = 800)
+        canvas.config(width = self.figsize[0]*400 , height = self.figsize[1]*180)
         self.enlarged = True
         
     def EnlargeNoteBook(self):
         for canvas in self.getNotebookCanvases():
-            canvas.config(width = 1917 , height = 800)        
+            canvas.config(width = self.figsize[0]*400 , height = self.figsize[1]*180)        
         
     def enlargeButton(self):        
         canvas = self.getCanvas()
@@ -308,7 +309,7 @@ class Waveframe(ttk.Notebook):
         guessAmp=Amplitude
         guessPhase = Phase
         
-        omega=freq=amp=phase=failCount=0
+        omega=freq=amp=phase=0
         parameter = [guessOmega, guessAmp, guessPhase]
         
         parameter, covariance = curve_fit(self.getSine, np.arange(len(waveForm))*1.E9/self.sampleRate, waveForm, 
@@ -375,14 +376,14 @@ class Waveframe(ttk.Notebook):
         
         axFreq = self.figs['freq'].add_subplot(111)
         
-        axFreq.plot(xf, self.convertToMag(scipy_fft), label='scipy')
+        axFreq.plot(xf, self.convertToMag(scipy_fft), label='scipy FFT')
         
         axFreq.set_title(self.title)
         axFreq.set_xlabel("Frequency (MHz)")
         axFreq.set_ylabel("Magnitude (arb.)")
         
-        axFreq.axvline(x=Freq/(10**6), color='r', linestyle='--',  linewidth=0.3, label='Frequency')
-        axFreq.axhline(y=Amp, color='r', linestyle='--', linewidth=0.3, label='Amplitude')
+        axFreq.axvline(x=Freq/(10**6), color='r', linestyle='--',  linewidth=0.15, label='Frequency')
+        axFreq.axhline(y=Amp, color='g', linestyle='--', linewidth=0.15, label='Amplitude')
         
         axFreq.legend(loc='upper right')
         

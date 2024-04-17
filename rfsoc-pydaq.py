@@ -7,7 +7,7 @@ from scipy.constants import speed_of_light
 
 #System Imports
 import logging
-import os, sys, inspect, importlib
+import os, sys, inspect, importlib, csv
 
 #Module Imports
 from textconsole.TextConsole import TextConsole
@@ -52,12 +52,25 @@ class submitButton:
         self.entry = tk.Entry(self.frame, width=12)
         self.entry.insert(0, placeholder_text)
         self.entry.pack(side=tk.LEFT)
+        self.entry.bind("<Return>", lambda event: submit_command())
         
         self.submit_button = tk.Button(self.frame, text="Submit", command=submit_command)
         self.submit_button.pack(side=tk.LEFT)
 
 #FPGA Class
 class RFSoC_Daq:
+    """
+    Class for data aquitisition on the RFSoC.
+    
+    Key methods to be accessed from the terminal (the rest should be run elsewhere)
+    
+    printWave(Channel Number), prints the amplitude, frequency and phase
+    calcPeakToPeakAmp(Channel Number), returns the difference from min to max
+    calcRMS(Channel Number), returns the RMS of the waveform
+    
+    saveWaveData(Level, Frequency), Saves data about wave, Level and Frequency should represent what one inputted into the wave
+    One Can save the enitre waveframe data from within the TKInter GUI
+    """
     def __init__(self,
                  frame,
                  numChannels = 4,
@@ -94,6 +107,7 @@ class RFSoC_Daq:
         ##to gather what frames have been plotted and what frames need to be added or removed
         ##and update the display frame accordingly. Will probably involve repacking
         ##Or changing the figure size
+        
         
         logger.debug(f"You will now record {self.numChannels} channels")
         return f"You will now record {self.numChannels} channels"
@@ -185,6 +199,13 @@ class RFSoC_Daq:
         else:
             raise ValueError('Not an available channel')
         
+    def calcPeakToPeakAmp(self, Ch = 0):
+        return abs(max(self.adcBuffer[Ch]) - min(self.adcBuffer[Ch]))/2
+    
+    def calcRMS(data):
+        squared_sum = sum((1000*x) ** 2 for x in data)
+        return math.sqrt(squared_sum / len(data))
+        
     def calcWL(self, Ch=0):
         if isinstance(Ch, int) and 0<=Ch<self.numChannels:
             wavelength = speed_of_light/self.calcWave(Ch)[1]
@@ -196,25 +217,77 @@ class RFSoC_Daq:
     ##Prints. For use in the terminal. Don't serve an immense amount of use within the program
     def printWave(self, Ch=-1):
         if isinstance(Ch, int) and 0<=Ch<self.numChannels:
-            amplitude, frequency = calcWave(Ch)
+            amplitude, frequency, phase = self.calcWave(Ch)
             print(f"Amplitude : {amplitude} ADC counts || Frequency : {frequency/10**6} MHz || Channel : {Ch}")
         elif Ch==-1:
             for i in range(self.numChannels):
-                amplitude, frequency = calcWave(Ch)
+                amplitude, frequency, phase = self.calcWave(Ch)
                 print(f"Channel {i} : Amplitude : {amplitude} ADC counts || Frequency : {frequency/10**6} MHz")
         else:
             return 'Not an available channel'
         
     def printWavelength(self, Ch=-1):
         if isinstance(Ch, int) and 0<=Ch<self.numChannels:
-            wavelength = calcWL(Ch)
+            wavelength = self.calcWL(Ch)
             print(f"Wavelength : {wavelength} metres || Channel : {Ch}")
         elif Ch==-1:
             for i in range(self.numChannels):
-                wavelength = calcWL(Ch)
+                wavelength = self.calcWL(Ch)
                 print(f"Channel {i} : Wavelength : {wavelength} metres")
         else:
             return 'Not an available channel'
+        
+    #Other methods could be fun to have
+    
+    #Saving data from terminal
+    ##Methods to save data from the terminal instead of the GUI
+    
+    def writeCSV(self, fileName, columns, data):
+        with open(fileName, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(columns)
+            writer.writerows(data)
+    
+    def saveWaveData(self, Level, Frequency):
+        path = f"/home/xilinx/rfsoc-pydaq/csvs/{Level}_{Frequency}.csv"
+        columns = ["Frequency", "Amplitude", "Max"]
+        data = []
+        for i in range(self.numChannels):
+            amplitude, frequency, phase = self.calcWave(i)
+            if abs(Frequency-frequency/10**6)>10:
+                print("Bad Frequency Measurement")
+            data.append([frequency/10**6, amplitude, self.calcPeakToPeakAmp(i), self.calcRMS(i)])
+        self.writeCSV(path, columns, data)
+        
+    def saveWaveData(self, Level, Frequency):
+        path = f"/home/xilinx/rfsoc-pydaq/csvs/{Level}_{Frequency}.csv"
+        columns = ["Frequency", "Amplitude", "Max"]
+        data = []
+        for i in range(self.numChannels):
+            amplitude, frequency, phase = self.calcWave(i)
+            if abs(Frequency-frequency/10**6)>10:
+                print("Bad Frequency Measurement")
+            data.append([frequency/10**6, amplitude, self.calcPeakToPeakAmp(i), self.calcRMS(i)])
+        self.writeCSV(path, columns, data)  
+            
+        
+    
+    ##Save the Calculated Data
+    ##Amplitude, frequency maybe others || should also have sample rate details || User should Input parameters used in process (actual frequency and power level)
+    ##Could compare how different things actually work compared to how they should
+    
+    #Number of Wave Lengths
+    ##Could obviously do this by calculating the WL but could have a different method. Frequency recording is somewhat inaccurate
+    
+    #Could have a method that returns a measure of how janky the plot is. 
+    ##I.e. channel 1's cable is poor quality and results in a janky plot (when viewed at significantly large sample size). If it's above a certian jankness then ditch
+    ##Also low power signals are pretty janky. Could use the fit function but that isn't great for non-sinusoidal waveforms
+    
+    #Standard deviation of peaks. 
+    ##Highly effected by the sample rate and kinda factors into the jankyness
+    
+    #You need better analysis tools
+
 
 def defaultUserCommand():
     return
@@ -292,6 +365,17 @@ def rfsocLoad(hardware = ""):
     os.chdir(curdir)
     return
 
+def Acquire(Channel = 0):
+    if theDaq.dev is None:
+        logger.error("No RFSoC device is loaded!")
+        
+    theDaq.dev.internal_capture(theDaq.adcBuffer,
+                                theDaq.numChannels)
+    
+    theDaq.wf[Channel].setWaveform(theDaq.adcBuffer[Channel])
+    
+    logger.debug("Acquired data")
+
 def rfsocAcquire():
     if theDaq.dev is None:
         logger.error("No RFSoC device is loaded!")
@@ -304,17 +388,23 @@ def rfsocAcquire():
         if theDaq.wf[i].toPlot == True:
             theDaq.wf[i].plot(theDaq.calcWave(i), [theDaq.plotFreq, theDaq.plotFit])
             
-    logger.debug("Acquired data")
+    logger.debug("Acquired data and Plotted")
     
 def ContAcquire():
     return 'Not complete'
 
 ##Buttons
 ##Simply retrieves the value from an input 'entry' box connected to a submit button
-def getSubmitInput(value):
+def getSubmitInput(value, needNumber):
     if isinstance(value, object):
         logger.debug("Passed in an object, attempting to .entry.get()")
-        result = eval(value.entry.get())
+        try:
+            result = eval(value.entry.get())
+        except (NameError, SyntaxError):
+            if needNumber == False:
+                result = value.entry.get()
+            else:
+                logger.debug("Please pass in a number")
     else:
         logger.debug("Passed in an value")
         result = value
@@ -322,7 +412,7 @@ def getSubmitInput(value):
 
 ##Action for submit butttons
 def submitNumSamples(value = 11):
-    NSamp = getSubmitInput(value)
+    NSamp = getSubmitInput(value, True)
     logger.debug(f"Currently have {theDaq.numSamples} samples, you have inputted {2**NSamp} samples")
     
     if isinstance(NSamp, int) and 0<NSamp<=14:
@@ -334,7 +424,7 @@ def submitNumSamples(value = 11):
         return 'Please input an appropriate Sample Size'
     
 def submitSampleRate(value = 3*10**9):
-    rate = getSubmitInput(value)
+    rate = getSubmitInput(value, True)
     logger.debug(f"Currently have {theDaq.sampleRate} samples, you have inputted {rate} samples")
     
     if rate>=10**5:
@@ -345,7 +435,7 @@ def submitSampleRate(value = 3*10**9):
         return 'Please input an appropriate Sample Rate'
     
 def submitNumberOfChannels(value = 4):
-    Channels = getSubmitInput(value)
+    Channels = getSubmitInput(value, True)
     ##Something probably needs to happen here but this whole method is somewhat pointless
     logger.debug(f"Currently have {theDaq.numChannels} samples, you have inputted {Channels} samples")
     
@@ -355,6 +445,14 @@ def submitNumberOfChannels(value = 4):
     else:
         logger.debug("Please input an appropriate number of channels")
         return 'Please input an appropriate number of channels'
+    
+def submitSaveName(value):
+    SaveName = getSubmitInput(value, False)
+    logger.debug(f"You are setting the Save Files name to : {SaveName}")
+    if SaveName and isinstance(SaveName, str) == False:
+        SaveName=str(SaveName)
+    for i in range(theDaq.numChannels):
+        theDaq.wf[i].saveText = SaveName
     
 ##Toggle action
 def toggle(tg, setFunc):
@@ -368,6 +466,15 @@ def toggle(tg, setFunc):
 
 def contAcquire():
     toggle()
+    
+    
+def Save():
+    index = displayFrame.winfo_children()[0].index
+    rfsocAcquire()
+    for i in range(100):
+        print(i)
+        displayFrame.winfo_children()[0].saveWF()
+        Acquire(index)
 
 ##Miscellaneous
 def getAppropriateFigSize():
@@ -401,9 +508,9 @@ if __name__ == '__main__':
     
     screen_width = root.winfo_screenwidth() * sizeEditor[0]
     screen_height = root.winfo_screenheight() * sizeEditor[1]
-    # figsize=(screen_width/(100*numChannels), screen_height/250)
+    figsize=(screen_width/(100*numChannels), screen_height/250)
     ##My Display appears to be not using the full 1920 width
-    figsize = (4.77, 4.32)
+    # figsize = (4.77, 4.32)
     
     logging.basicConfig(level=logging.DEBUG)
     displayFrame = tk.Frame(master = root,
@@ -451,12 +558,16 @@ if __name__ == '__main__':
     buttons['Reset'] = tk.Button(buttonFrame,
                                 text = "Reset",
                                 command = reload_script)
+    buttons['Save'] = tk.Button(buttonFrame,
+                                text = "Save",
+                                command = Save)
     
     
     buttons['Load'].pack( side = tk.LEFT )
     buttons['Acquire'].pack( side = tk.LEFT )
     buttons['User'].pack( side = tk.LEFT )
     buttons['Reset'].pack( side = tk.LEFT )
+    buttons['Save'].pack( side = tk.LEFT )
 
     #A slider that works (as a piece of GUI) but don't have a use for currently
     # buton = tk.Scale(orient = tk.HORIZONTAL,length = 50,to = 1,showvalue = False,sliderlength = 25,label = "  Off",command = degis)
@@ -483,8 +594,9 @@ if __name__ == '__main__':
     
     ##Most of these don't do anything important. But it's nice that the submit button infrasturctture is there
     buttons['SetSampleSize'] = submitButton(root, submitFrame, "Set Sample Number (exponent of 2):", sampleExponent, lambda: submitNumSamples(buttons['SetSampleSize']))
-    buttons['SetSampleRate'] = submitButton(root, submitFrame, "Set Sample Rate (Redundant):", sampleRate, lambda: submitSampleRate(buttons['SetSampleRate']))
-    buttons['SetChannelCount'] = submitButton(root, submitFrame, "Set Number of Channels:", numChannels, lambda: submitNumberOfChannels(buttons['SetChannelCount']))   
+    # buttons['SetSampleRate'] = submitButton(root, submitFrame, "Set Sample Rate (Redundant):", sampleRate, lambda: submitSampleRate(buttons['SetSampleRate']))
+    # buttons['SetChannelCount'] = submitButton(root, submitFrame, "Set Number of Channels:", numChannels, lambda: submitNumberOfChannels(buttons['SetChannelCount']))
+    buttons['SetSaveText'] = submitButton(root, submitFrame, "Set the FileName:", "None", lambda: submitSaveName(buttons['SetSaveText']))   
     
     submitFrame.pack( side = tk.TOP )
 
