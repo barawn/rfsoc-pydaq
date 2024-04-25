@@ -192,7 +192,7 @@ class RFSoC_Daq:
             phase_spectrum = np.angle(fft_result[:N//2])
             peak_freq_index = np.argmax(mag_spectrum)
             frequency = xf[peak_freq_index]
-            amplitude = mag_spectrum[peak_freq_index] * 2 / N
+            amplitude = self.calcPeakToPeakAmp(Ch) # mag_spectrum[peak_freq_index] * 2 / N
             phase = phase_spectrum[peak_freq_index]
             # logging.debug(f"Amplitude: {amplitude:.3f} ADC counts || Frequency: {(frequency/10**6):.3f} MHz || Phase: {phase:.3f} rad || Channel: {Ch}")
             return amplitude, frequency, phase
@@ -469,11 +469,14 @@ def contAcquire():
     
     
 def Save():
-    index = displayFrame.winfo_children()[0].index
+    index = 0
+    for widget in displayFrame.winfo_children():
+        if widget.enlarged == True:
+            index = widget.index
     rfsocAcquire()
-    for i in range(100):
+    for i in range(1000):
         print(i)
-        displayFrame.winfo_children()[0].saveWF()
+        displayFrame.winfo_children()[index].saveWF()
         Acquire(index)
 
 ##Miscellaneous
