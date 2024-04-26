@@ -18,7 +18,7 @@ class ScrolledLog(ScrolledText):
         def emit(self, record):
             self.log_queue.put(record)
 
-    def __init__(self, frame, logger, height=5):
+    def __init__(self, frame, logger, height=8):
         self.frame = frame
         self.logger = logger
         super().__init__(frame, state='disabled', height=height)        

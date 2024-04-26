@@ -38,7 +38,6 @@ theDaq = None
 ##Submit button requires numerous compoennts and was easier to make a class
 class submitButton:
     def __init__(self,
-                 master,
                  frame,
                  label_text,
                  placeholder_text,
@@ -87,8 +86,8 @@ class RFSoC_Daq:
         #Inititalising instance attributes
         self.adcBuffer = np.zeros( (numChannels, numSamples), np.int16 )
         self.dev = None
-        self.plotFreq = True
-        self.plotFit = True
+        self.plotFreq = False
+        self.plotFit = False
         self.wf = []
 
         self.startWaveFrame()
@@ -204,7 +203,7 @@ class RFSoC_Daq:
     
     def calcRMS(data):
         squared_sum = sum((1000*x) ** 2 for x in data)
-        return math.sqrt(squared_sum / len(data))
+        return np.sqrt(squared_sum / len(data))
         
     def calcWL(self, Ch=0):
         if isinstance(Ch, int) and 0<=Ch<self.numChannels:
@@ -237,9 +236,6 @@ class RFSoC_Daq:
         else:
             return 'Not an available channel'
         
-    #Other methods could be fun to have
-    
-    #Saving data from terminal
     ##Methods to save data from the terminal instead of the GUI
     
     def writeCSV(self, fileName, columns, data):
@@ -259,29 +255,21 @@ class RFSoC_Daq:
             data.append([frequency/10**6, amplitude, self.calcPeakToPeakAmp(i), self.calcRMS(i)])
         self.writeCSV(path, columns, data)
         
-    def saveWaveData(self, Level, Frequency):
-        path = f"/home/xilinx/rfsoc-pydaq/csvs/{Level}_{Frequency}.csv"
-        columns = ["Frequency", "Amplitude", "Max"]
-        data = []
-        for i in range(self.numChannels):
-            amplitude, frequency, phase = self.calcWave(i)
-            if abs(Frequency-frequency/10**6)>10:
-                print("Bad Frequency Measurement")
-            data.append([frequency/10**6, amplitude, self.calcPeakToPeakAmp(i), self.calcRMS(i)])
-        self.writeCSV(path, columns, data)  
-            
+    def saveWaveform(self, Ch, Level, Frequency):
         
+        path = f"/home/xilinx/rfsoc-pydaq/data/{portNames[Ch]}{Level}_{Frequency}.csv"
+        
+        data = list(zip(np.arange(len(self.waveForm))/self.sampleRate, self.adcBuffer[Ch]))
+        
+        with open(path, mode='a', newline='') as file: #mode='w'
+            writer = csv.writer(file)
+            writer.writerows(data)  
+        logger.debug("Waveform data saved")
+        return 'Saved Waveform'
     
-    ##Save the Calculated Data
-    ##Amplitude, frequency maybe others || should also have sample rate details || User should Input parameters used in process (actual frequency and power level)
-    ##Could compare how different things actually work compared to how they should
-    
-    #Number of Wave Lengths
-    ##Could obviously do this by calculating the WL but could have a different method. Frequency recording is somewhat inaccurate
-    
-    #Could have a method that returns a measure of how janky the plot is. 
+    #Could have a method that returns a measure of how 'janky' the plot is. 
     ##I.e. channel 1's cable is poor quality and results in a janky plot (when viewed at significantly large sample size). If it's above a certian jankness then ditch
-    ##Also low power signals are pretty janky. Could use the fit function but that isn't great for non-sinusoidal waveforms
+    ##Also low power signals are pretty janky. Could use the fit function but that isn't great for non-sinusoidal waveforms (It's not great for sinusoidal waves either now that I think of it)
     
     #Standard deviation of peaks. 
     ##Highly effected by the sample rate and kinda factors into the jankyness
@@ -290,6 +278,7 @@ class RFSoC_Daq:
 
 
 def defaultUserCommand():
+    logger.debug("Default Command Called")
     return
 
 def rfsocLoad(hardware = ""):
@@ -464,20 +453,45 @@ def toggle(tg, setFunc):
         setFunc(False)
     return 'Updated plotting'
 
+def toggleOff():
+    if toggles["Freq"].config('relief')[-1] == 'raised':
+        toggles["Freq"].config(relief="sunken")
+        theDaq.setPlotFreq(False)
+    if toggles["Fit"].config('relief')[-1] == 'raised':
+        toggles["Fit"].config(relief="sunken")
+        theDaq.setPlotFit(False)
+
 def contAcquire():
     toggle()
     
     
-def Save():
+def getEnlargedNotebook():
     index = 0
     for widget in displayFrame.winfo_children():
         if widget.enlarged == True:
             index = widget.index
+    return index
+
+def Save():
+    index = getEnlargedNotebook()
     rfsocAcquire()
     for i in range(1000):
         print(i)
         displayFrame.winfo_children()[index].saveWF()
         Acquire(index)
+        
+
+def switchToTab(index):
+    for widget in displayFrame.winfo_children():
+        widget.switchToTab(index)
+
+def switchTab():
+    for widget in displayFrame.winfo_children():
+        widget.switchTab()
+
+def switchTabBack():
+    for widget in displayFrame.winfo_children():
+        widget.switchTabBack()
 
 ##Miscellaneous
 def getAppropriateFigSize():
@@ -504,10 +518,13 @@ def degis(value):
         buton["label"] = "  On"
     else:
         buton["label"] = "  Off"
-        
-        
+    
 if __name__ == '__main__':
     root = tk.Tk()
+    
+    ##Binding Hotkeys
+    # root.bind("<F5>", lambda event: rfsocAcquire())
+    # root.bind("<Control-s>", lambda event: Save())
     
     screen_width = root.winfo_screenwidth() * sizeEditor[0]
     screen_height = root.winfo_screenheight() * sizeEditor[1]
@@ -577,17 +594,17 @@ if __name__ == '__main__':
     # buton.pack()
     
     buttonFrame.pack( side = tk.TOP )
-    
+
     toggles = {}
     toggles["Freq"] = tk.Button(toggleFrame,
                                     text="Freq", 
                                     width=8, 
-                                    relief="raised",
+                                    relief="sunken",
                                     command=lambda: toggle(toggles["Freq"], theDaq.setPlotFreq))
     toggles["Fit"] = tk.Button(toggleFrame,
                                     text="Fit", 
                                     width=8, 
-                                    relief="raised",
+                                    relief="sunken",
                                     command=lambda: toggle(toggles["Fit"], theDaq.setPlotFit))
     
     toggles["Freq"].pack( side = tk.LEFT )
@@ -596,12 +613,35 @@ if __name__ == '__main__':
     toggleFrame.pack( side = tk.TOP )
     
     ##Most of these don't do anything important. But it's nice that the submit button infrasturctture is there
-    buttons['SetSampleSize'] = submitButton(root, submitFrame, "Set Sample Number (exponent of 2):", sampleExponent, lambda: submitNumSamples(buttons['SetSampleSize']))
+    buttons['SetSampleSize'] = submitButton(submitFrame, "Set Sample Number (exponent of 2):", sampleExponent, lambda: submitNumSamples(buttons['SetSampleSize']))
     # buttons['SetSampleRate'] = submitButton(root, submitFrame, "Set Sample Rate (Redundant):", sampleRate, lambda: submitSampleRate(buttons['SetSampleRate']))
     # buttons['SetChannelCount'] = submitButton(root, submitFrame, "Set Number of Channels:", numChannels, lambda: submitNumberOfChannels(buttons['SetChannelCount']))
-    buttons['SetSaveText'] = submitButton(root, submitFrame, "Set the FileName:", "None", lambda: submitSaveName(buttons['SetSaveText']))   
+    buttons['SetSaveText'] = submitButton(submitFrame, "Set the FileName:", "Temp", lambda: submitSaveName(buttons['SetSaveText']))   
     
     submitFrame.pack( side = tk.TOP )
+        
+    root.bind("<F5>", lambda event: buttons['Acquire'].invoke())
+    
+    root.bind("<Control-s>", lambda event: buttons['Save'].invoke())
+    # root.bind("<Control-f>", lambda event: (toggles["Freq"].invoke(), toggles["Fit"].invoke()))
+    root.bind("<Control-f>", lambda event: toggleOff())
+    
+    
+    root.bind("<Control-p>", lambda event: displayFrame.winfo_children()[getEnlargedNotebook()].btns['SavePlt'].invoke())
+        
+    root.bind("<F1>", lambda event: displayFrame.winfo_children()[0].btns['Enlarge'].invoke())
+    root.bind("<F2>", lambda event: displayFrame.winfo_children()[1].btns['Enlarge'].invoke())
+    root.bind("<F3>", lambda event: displayFrame.winfo_children()[2].btns['Enlarge'].invoke())
+    root.bind("<F4>", lambda event: displayFrame.winfo_children()[3].btns['Enlarge'].invoke())
+    
+    root.bind("<F9>", lambda event: switchToTab(0))
+    root.bind("<F10>", lambda event: switchToTab(1))
+    root.bind("<F11>", lambda event: switchToTab(2))
+    root.bind("<F12>", lambda event: switchToTab(3))
+    
+    root.bind("<Control-Tab>", lambda event: switchTab())
+    root.bind("<Control-Shift-Tab>", lambda event: switchTabBack())
+    
 
     locals = { 'daq' : theDaq,
                'buttons' : buttons }
@@ -615,5 +655,7 @@ if __name__ == '__main__':
     logFrame.pack( fill='x', side = tk.TOP )
     
     rfsocLoad(hardware = "zcumts")
+    
+    logger.debug("Hotkeys:\nf1 : Toggle Enlarge on Channel 0\nf2 : Toggle Enlarge on Channel 1\nf3 : Toggle Enlarge on Channel 2\nf4 : Toggle Enlarge on Channel 3\n\nf5 : Invokes Acquire Method\n\nCtrl+s : Invoke Save buttons method\n\nCtrl+f : Toggle both the freq and fit off\n\nCtrl+p : Saves plot of enlarged canvas")
         
     root.mainloop()

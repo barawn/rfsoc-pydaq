@@ -45,7 +45,7 @@ class Waveframe(ttk.Notebook):
         ##Required issues with buttons otherwise
         self.notebook = ttk.Notebook(self)
         self.notebook.pack(fill=tk.BOTH, expand=True)
-        
+                
         self.figs = {}
         self.canvs = {}
         self.btns = {}
@@ -118,6 +118,19 @@ class Waveframe(ttk.Notebook):
         
         # Callback signature is data, figure, canvas
         self.user_callback = None
+    
+    def switchToTab(self, index):
+        self.notebook.select(index)
+    
+    def switchTab(self):
+        num_tabs = len(self.notebook.tabs())
+        current = self.notebook.index(self.notebook.select())
+        self.notebook.select((current+1)%num_tabs)
+        
+    def switchTabBack(self):
+        num_tabs = len(self.notebook.tabs())
+        current = self.notebook.index(self.notebook.select())
+        self.notebook.select((current-1)%num_tabs)
         
     ##Sets
     def setWaveform(self, data):
@@ -255,9 +268,20 @@ class Waveframe(ttk.Notebook):
         
     def EnlargeNoteBook(self):
         for canvas in self.getNotebookCanvases():
-            canvas.config(width = self.figsize[0]*400 , height = self.figsize[1]*180)        
-        
-    def enlargeButton(self):        
+            canvas.config(width = self.figsize[0]*400 , height = self.figsize[1]*180)     
+            
+    def resetDisplay(self):
+        widgets = self.parent.winfo_children()
+        instance = False
+        for widget in widgets:
+            if widget != self:
+                if widget.enlarged == True:
+                    widget.btns['Enlarge'].invoke()
+            
+    def enlargeButton(self):
+        ##May need deleting
+        self.resetDisplay()
+          
         canvas = self.getCanvas()
         if self.btns['Enlarge'].config('relief')[-1] == 'sunken':
             print("Reseting")
