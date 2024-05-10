@@ -21,10 +21,31 @@ from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk
 from matplotlib.backend_bases import key_press_handler
 from matplotlib.figure import Figure
 
+class PlotDisplay(ttk.Frame):
+    def __init__(self,
+                 parent: ttk.Notebook,
+                 figs: object,
+                 canvs: object,
+                 figsize: tuple,
+                 title):
+        super().__init__(parent)
+        
+        self.parent = parent
+        
+        self.figs = figs
+        self.canvs = canvs
+        
+        self.figs[title] = Figure(figsize=figsize)
+        self.canvs[title] = FigureCanvasTkAgg(self.figs[title],
+                                               master=self)
+        self.canvs[title].draw()
+        self.canvs[title].get_tk_widget().pack()
+        self.parent.add(self, text=title)
+    
 class Waveframe(ttk.Notebook):
     def __init__(self,
-                 parent,
-                 index,
+                 parent: tk.Frame,
+                 index: int,
                  title,
                  sampleRate=3.E9,
                  figsize=(3,2)):
@@ -38,7 +59,7 @@ class Waveframe(ttk.Notebook):
         self.toPlot = True
         self.enlarged = False
         self.waveForm = 0
-        self.saveText = None
+        self.saveText = "Temp"
         
         super().__init__(self.parent)
         
@@ -50,51 +71,13 @@ class Waveframe(ttk.Notebook):
         self.canvs = {}
         self.btns = {}
         
-        ##Set up the time figure
-        self.td = ttk.Frame(self)
-        self.figs['time'] = Figure(figsize=figsize)
-        self.canvs['time'] = FigureCanvasTkAgg(self.figs['time'],
-                                               master=self.td)
-        self.canvs['time'].draw()
-        self.canvs['time'].get_tk_widget().pack()
-        self.notebook.add(self.td, text='Time')
+        self.time = PlotDisplay(self.notebook, self.figs, self.canvs, figsize, "time")
         
-        ##Set up the Fourier Transform Frequency Figure
-        self.fd = ttk.Frame(self)
-        self.figs['freq'] = Figure(figsize=figsize)
-        self.canvs['freq'] = FigureCanvasTkAgg(self.figs['freq'],
-                                               master=self.fd)
-        self.canvs['freq'].draw()
-        self.canvs['freq'].get_tk_widget().pack()
-        self.notebook.add(self.fd, text='Freq')
+        self.freq = PlotDisplay(self.notebook, self.figs, self.canvs, figsize, "freq") 
         
-        ##Set up the fitted Waveform Figure
-        self.ad = ttk.Frame(self)
-        self.figs['fit'] = Figure(figsize=figsize)
-        self.canvs['fit'] = FigureCanvasTkAgg(self.figs['fit'],
-                                               master=self.ad)
-        self.canvs['fit'].draw()
-        self.canvs['fit'].get_tk_widget().pack()
-        self.notebook.add(self.ad, text='Fit')
+        self.fit = PlotDisplay(self.notebook, self.figs, self.canvs, figsize, "fit") 
         
-        ##I don't know why this is here
-        self.user = ttk.Frame(self)
-        self.figs['user'] = Figure(figsize=figsize)
-        self.canvs['user'] = FigureCanvasTkAgg(self.figs['user'],
-                                               master=self.user)
-        self.canvs['user'].draw()
-        self.canvs['user'].get_tk_widget().pack()
-        self.notebook.add(self.user, text='User')
-        
-        #Template for adding new things
-        
-        # self.new = ttk.Frame(self)
-        # self.figs['new'] = Figure(figsize=figsize)
-        # self.canvs['new'] = FigureCanvasTkAgg(self.figs['new'],
-        #                                        master=self.new)
-        # self.canvs['new'].draw()
-        # self.canvs['new'].get_tk_widget().pack()
-        # self.add(self.new, text='New')
+        self.user = PlotDisplay(self.notebook, self.figs, self.canvs, figsize, "user")
 
         ##Buttons for the waveform to record stuff and change the view.
         self.btn_frame = tk.Frame(self)
@@ -108,7 +91,6 @@ class Waveframe(ttk.Notebook):
         self.btns['Enlarge'] = tk.Button(self.btn_frame, relief="raised", text="Enlarge", command=self.enlargeButton)
         self.btns['Enlarge'].pack(side=tk.LEFT)
         
-        ##This is a toggle to plot the channels waveform or not
         self.btns['Plot'] = tk.Button(self.btn_frame, relief="raised", text="Plot?", command=self.plotButton)
         self.btns['Plot'].pack(side=tk.LEFT)
         
@@ -213,15 +195,30 @@ class Waveframe(ttk.Notebook):
         return path
     
     def saveWF(self):
-        path = self.saveName("data/", ".csv")
+        directory = "testConsistency"
+        path = f"/home/xilinx/rfsoc-pydaq/{directory}/dummy.csv"
         
         data = list(zip(np.arange(len(self.waveForm))/self.sampleRate, self.waveForm))
         
-        with open(path, mode='a', newline='') as file: #mode='w'
+        with open(path, mode='a', newline='') as file:
             writer = csv.writer(file)
             writer.writerows(data)  
         logger.debug("Waveform data saved")
         return 'Saved Waveform'
+    
+    def setSaveWFName(self):
+        directory = "testConsistency"
+        pathTemp = f"/home/xilinx/rfsoc-pydaq/{directory}/dummy.csv"
+        with open(pathTemp, 'r') as temp_file:
+            temp_data = temp_file.readlines()
+            
+        path = self.saveName(f"{directory}/", ".csv")
+
+        with open(path, 'w', newline='') as new_file:
+            new_file.writelines(temp_data)
+
+        # Clear temp.csv
+        open(pathTemp, 'w').close()
     
     def SavePlt(self):
         current_canvas = self.getCanvas()
@@ -338,7 +335,7 @@ class Waveframe(ttk.Notebook):
         
         parameter, covariance = curve_fit(self.getSine, np.arange(len(waveForm))*1.E9/self.sampleRate, waveForm, 
                                           p0=[guessOmega,guessAmp,guessPhase], 
-                                          bounds=([guessOmega*0.9, guessAmp, guessPhase-0.25*np.pi], [guessOmega/0.9, guessAmp/0.7, guessPhase+0.25*np.pi]))
+                                          bounds=([guessOmega*0.9, guessAmp, guessPhase-np.pi], [guessOmega/0.9, guessAmp/0.7, guessPhase+np.pi]))
         omega=parameter[0]
         freq=parameter[0]/(2*np.pi)
         amp=parameter[1]
@@ -383,8 +380,9 @@ class Waveframe(ttk.Notebook):
         ax.set_xlabel('time (ns)')
         ax.set_ylabel('ADC Counts', labelpad=-3.5)
         
-        ax.axhline(y=0, color='black', linestyle='--', linewidth=0.5, label='Zero Line')
+        ax.axhline(y=0, color='black', linewidth=0.4, label='Zero Line')
         ax.axhline(y=Amp, color='black', linestyle='--', linewidth=0.3, label='Amplitude Line')
+        ax.axhline(y=-Amp, color='black', linestyle='--', linewidth=0.3, label='Amplitude Line')
         
         stats_text = f"Amplitude: {Amp:.2f} Counts\nFrequency: {(Freq/10**6):.2f} MHz\nPhase: {Phase:.2f} radians"
         ax.text(0.95, 0.95, stats_text, verticalalignment='top', horizontalalignment='right',

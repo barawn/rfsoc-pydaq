@@ -4,10 +4,12 @@ import tkinter as tk
 from tkinter import filedialog
 from scipy.fft import fft, ifft, fftfreq
 from scipy.constants import speed_of_light
+from typing import Callable
 
 #System Imports
 import logging
-import os, sys, inspect, importlib, csv
+import subprocess
+import os, sys, inspect, importlib, configparser, csv
 
 #Module Imports
 from textconsole.TextConsole import TextConsole
@@ -17,10 +19,15 @@ from waveframe.Waveframe import Waveframe
 logger = logging.getLogger(__name__)
 
 #Establishing base values for parameters
-numChannels = 4     ##Probably shouldn't change
-sampleExponent = 5#11
-numSamples = 2**sampleExponent#2**12#2**11
+default_numChannels = 4
+default_numSamples = 2048
+default_sampleRate = 3.E9
+
+numChannels = 4
+sampleExponent = 5
+numSamples = 2**sampleExponent
 sampleRate = 3.E9
+
 figsize = (3,2)
 
 ##Not all screens are so accomadating to this quick change
@@ -38,17 +45,24 @@ theDaq = None
 ##Submit button requires numerous compoennts and was easier to make a class
 class submitButton:
     def __init__(self,
-                 frame,
+                 frame: tk.Frame,
                  label_text,
                  placeholder_text,
-                 submit_command):
+                 submit_command: Callable,
+                 Auto=False):
         
         self.frame=frame
         
         self.label =tk.Label(self.frame, text=label_text)
         self.label.pack(side=tk.LEFT)
         
-        self.entry = tk.Entry(self.frame, width=12)
+        vcmd = self.frame.register(self.validate)
+        
+        if Auto:
+            self.Auto = Auto
+            self.entry = tk.Entry(self.frame, width=12, validate="key", validatecommand=(vcmd, '%P'))
+        else:
+            self.entry = tk.Entry(self.frame, width=12)
         self.entry.insert(0, placeholder_text)
         self.entry.pack(side=tk.LEFT)
         self.entry.bind("<Return>", lambda event: submit_command())
@@ -56,26 +70,48 @@ class submitButton:
         self.submit_button = tk.Button(self.frame, text="Submit", command=submit_command)
         self.submit_button.pack(side=tk.LEFT)
 
+    def validate(self, new_text):
+        if not new_text:
+            self.input = None
+            return True
+        try:
+            input = int(new_text)
+            if self.Auto[0] <= input <= self.Auto[1]:
+                self.input = input
+                return True
+            else:
+                return False
+        except ValueError:
+            return False
+
 #FPGA Class
 class RFSoC_Daq:
-    """
-    Class for data aquitisition on the RFSoC.
+    """ Class holding all of the data for the current program.
+    The RFSoC_Daq class holds all of the user-accessible
+    data for the current program instance involving accessing
+    the RFSoC.
     
-    Key methods to be accessed from the terminal (the rest should be run elsewhere)
-    
-    printWave(Channel Number), prints the amplitude, frequency and phase
-    calcPeakToPeakAmp(Channel Number), returns the difference from min to max
-    calcRMS(Channel Number), returns the RMS of the waveform
-    
-    saveWaveData(Level, Frequency), Saves data about wave, Level and Frequency should represent what one inputted into the wave
-    One Can save the enitre waveframe data from within the TKInter GUI
+    Attributes
+    ----------
+    numChannels : int
+       Number of channels accessible (usually 4).
+    numSamples : int
+       Number of samples in an acquisition.
+    adcBuffer : numpy.ndarray
+       Buffer containing the last acquired data
+    dev : pynq.Overlay
+       Class representing the current programmed RFSoC    
+    frame : tkinter.Frame 
+       Tk frame holding the Waveframes
+    wf : :obj:`list` of :obj:`waveframe.Waveframe`
+       numChannels list of the Waveframes in the DAQ
     """
     def __init__(self,
-                 frame,
-                 numChannels = 4,
-                 numSamples = 2048,
+                 frame: tk.Frame,
+                 numChannels: int = 4,
+                 numSamples: int = 2048,
                  sampleRate = 3.E9,
-                 figsize = (3,2)):
+                 figsize: tuple = (3,2)):
         
         #Inputs
         self.frame = frame
@@ -267,6 +303,9 @@ class RFSoC_Daq:
         logger.debug("Waveform data saved")
         return 'Saved Waveform'
     
+    def printHotkeys(self):
+        print("Hotkeys:\nf1-4 : Toggle Enlarge on Channel 0-3\n\nf5 : Invokes Acquire Method\n\nCtrl+s : Invoke Save buttons method\nCtrl+p : Saves plot of enlarged canvas\nCtrl+f : Toggle both the freq and fit off\n\nf9-12 : Switch all Notebook tabs to index 0-3\nPage Up and Page Down : Toggle up and down in notebook tabs\n")
+        
     #Could have a method that returns a measure of how 'janky' the plot is. 
     ##I.e. channel 1's cable is poor quality and results in a janky plot (when viewed at significantly large sample size). If it's above a certian jankness then ditch
     ##Also low power signals are pretty janky. Could use the fit function but that isn't great for non-sinusoidal waveforms (It's not great for sinusoidal waves either now that I think of it)
@@ -287,6 +326,18 @@ def rfsocLoad(hardware = ""):
     and must support the "internal_capture( buffer, numChannels )"
     function.
     """    
+    
+    output = subprocess.check_output(['lsmod'])
+    if b'zocl' in output:
+        rmmod_output = subprocess.run(['rmmod', 'zocl'])
+        assert rmmod_output.returncode == 0, "Could not restart zocl. Please Shutdown All Kernels and then restart"
+        modprobe_output = subprocess.run(['modprobe', 'zocl'])
+        assert modprobe_output.returncode == 0, "Could not restart zocl. It did not restart as expected"
+    else:
+        modprobe_output = subprocess.run(['modprobe', 'zocl'])
+        assert modprobe_output.returncode == 0, "Could not restart ZOCL!"
+    
+    
     ##Edited such that one can automatically load zcumts from within the main loop
     if hardware == "zcumts":
         ##Ammend this location to your leisure
@@ -307,6 +358,7 @@ def rfsocLoad(hardware = ""):
     os.chdir(newdir)
     base, extension = os.path.splitext(os.path.basename(file_path))
     logger.debug("Going to try to import %s", base)
+        
     # create a custom exception
     class LocalException(Exception):
         pass
@@ -475,10 +527,11 @@ def getEnlargedNotebook():
 def Save():
     index = getEnlargedNotebook()
     rfsocAcquire()
-    for i in range(1000):
+    for i in range(100):
         print(i)
         displayFrame.winfo_children()[index].saveWF()
         Acquire(index)
+    displayFrame.winfo_children()[index].setSaveWFName()
         
 
 def switchToTab(index):
@@ -500,16 +553,13 @@ def getAppropriateFigSize():
     return (screen_width/(100*theDaq.numChannels),screen_height/250)
 
 ##This currently doesn't do what I want
-##Since one has to restart the entire script if any ammendments to methods or variables are made in the code I thought it would be nice to have some kind of reset feature that restarts the program with the ammendments. It doesn't work however.
+##This doesn't account for zocl not restarting
 def reload_script():
-    main_script = sys.argv[0]
+    print("Trying to restart")
+    python = sys.executable
+    script = os.path.abspath(sys.argv[0])
     
-    main_script = main_script.replace('.py', '')
-    
-    if main_script in sys.modules:
-        importlib.reload(sys.modules[main_script])
-    else:
-        logger.debug(f"Module '{main_script}' not found in sys.modules")
+    os.execl(python, python, script)
         
 ##This just a method for a slider that can be ignored
 def degis(value):
@@ -521,10 +571,6 @@ def degis(value):
     
 if __name__ == '__main__':
     root = tk.Tk()
-    
-    ##Binding Hotkeys
-    # root.bind("<F5>", lambda event: rfsocAcquire())
-    # root.bind("<Control-s>", lambda event: Save())
     
     screen_width = root.winfo_screenwidth() * sizeEditor[0]
     screen_height = root.winfo_screenheight() * sizeEditor[1]
@@ -575,9 +621,9 @@ if __name__ == '__main__':
                                 text = "User",
                                 command = defaultUserCommand)
     ##This button throws an error but doesn't stop the program. May as well be ignored till it works
-    buttons['Reset'] = tk.Button(buttonFrame,
-                                text = "Reset",
-                                command = reload_script)
+    buttons['Restart'] = tk.Button(buttonFrame,
+                                text = "Restart",
+                                command = defaultUserCommand)#reload_script)
     buttons['Save'] = tk.Button(buttonFrame,
                                 text = "Save",
                                 command = Save)
@@ -586,7 +632,7 @@ if __name__ == '__main__':
     buttons['Load'].pack( side = tk.LEFT )
     buttons['Acquire'].pack( side = tk.LEFT )
     buttons['User'].pack( side = tk.LEFT )
-    buttons['Reset'].pack( side = tk.LEFT )
+    buttons['Restart'].pack( side = tk.LEFT )
     buttons['Save'].pack( side = tk.LEFT )
 
     #A slider that works (as a piece of GUI) but don't have a use for currently
@@ -613,34 +659,34 @@ if __name__ == '__main__':
     toggleFrame.pack( side = tk.TOP )
     
     ##Most of these don't do anything important. But it's nice that the submit button infrasturctture is there
-    buttons['SetSampleSize'] = submitButton(submitFrame, "Set Sample Number (exponent of 2):", sampleExponent, lambda: submitNumSamples(buttons['SetSampleSize']))
+    buttons['SetSampleSize'] = submitButton(submitFrame, "Set Sample Number (exponent of 2):", sampleExponent, lambda: submitNumSamples(buttons['SetSampleSize']), (1,14))
     # buttons['SetSampleRate'] = submitButton(root, submitFrame, "Set Sample Rate (Redundant):", sampleRate, lambda: submitSampleRate(buttons['SetSampleRate']))
     # buttons['SetChannelCount'] = submitButton(root, submitFrame, "Set Number of Channels:", numChannels, lambda: submitNumberOfChannels(buttons['SetChannelCount']))
     buttons['SetSaveText'] = submitButton(submitFrame, "Set the FileName:", "Temp", lambda: submitSaveName(buttons['SetSaveText']))   
     
     submitFrame.pack( side = tk.TOP )
         
-    root.bind("<F5>", lambda event: buttons['Acquire'].invoke())
-    
     root.bind("<Control-s>", lambda event: buttons['Save'].invoke())
-    # root.bind("<Control-f>", lambda event: (toggles["Freq"].invoke(), toggles["Fit"].invoke()))
-    root.bind("<Control-f>", lambda event: toggleOff())
-    
-    
     root.bind("<Control-p>", lambda event: displayFrame.winfo_children()[getEnlargedNotebook()].btns['SavePlt'].invoke())
+    
+    root.bind("<Control-f>", lambda event: toggleOff())
         
     root.bind("<F1>", lambda event: displayFrame.winfo_children()[0].btns['Enlarge'].invoke())
     root.bind("<F2>", lambda event: displayFrame.winfo_children()[1].btns['Enlarge'].invoke())
     root.bind("<F3>", lambda event: displayFrame.winfo_children()[2].btns['Enlarge'].invoke())
     root.bind("<F4>", lambda event: displayFrame.winfo_children()[3].btns['Enlarge'].invoke())
     
+    root.bind("<F5>", lambda event: buttons['Acquire'].invoke())
+    
+    root.bind("<F7>", lambda event: buttons['Restart'].invoke())
+    
     root.bind("<F9>", lambda event: switchToTab(0))
     root.bind("<F10>", lambda event: switchToTab(1))
     root.bind("<F11>", lambda event: switchToTab(2))
     root.bind("<F12>", lambda event: switchToTab(3))
     
-    root.bind("<Control-Tab>", lambda event: switchTab())
-    root.bind("<Control-Shift-Tab>", lambda event: switchTabBack())
+    root.bind("<Next>", lambda event: switchTab())
+    root.bind("<Prior>", lambda event: switchTabBack())
     
 
     locals = { 'daq' : theDaq,
@@ -656,6 +702,6 @@ if __name__ == '__main__':
     
     rfsocLoad(hardware = "zcumts")
     
-    logger.debug("Hotkeys:\nf1 : Toggle Enlarge on Channel 0\nf2 : Toggle Enlarge on Channel 1\nf3 : Toggle Enlarge on Channel 2\nf4 : Toggle Enlarge on Channel 3\n\nf5 : Invokes Acquire Method\n\nCtrl+s : Invoke Save buttons method\n\nCtrl+f : Toggle both the freq and fit off\n\nCtrl+p : Saves plot of enlarged canvas")
+    logger.debug("Hotkeys:\nf1-4 : Toggle Enlarge on Channel 0-3\n\nf5 : Invokes Acquire Method\n\nCtrl+s : Invoke Save buttons method\nCtrl+p : Saves plot of enlarged canvas\nCtrl+f : Toggle both the freq and fit off\n\nf9-12 : Switch all Notebook tabs to index 0-3\nPage Up and Page Down : Toggle up and down in notebook tabs\n")
         
     root.mainloop()
