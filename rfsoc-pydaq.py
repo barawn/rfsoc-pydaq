@@ -15,6 +15,7 @@ import os, sys, inspect, importlib, configparser, csv
 from textconsole.TextConsole import TextConsole
 from scrolledlog.ScrolledLog import ScrolledLog
 from waveframe.Waveframe import Waveframe
+from waveframe.Waveframes import Waveframes
 
 logger = logging.getLogger(__name__)
 
@@ -110,30 +111,28 @@ class RFSoC_Daq:
                  frame: tk.Frame,
                  numChannels: int = 4,
                  numSamples: int = 2048,
-                 sampleRate = 3.E9,
-                 figsize: tuple = (3,2)):
+                 sampleRate = 3.E9):
         
         #Inputs
         self.frame = frame
         self.numChannels = numChannels
         self.numSamples = numSamples
         self.sampleRate = sampleRate
-        self.figsize = figsize
         #Inititalising instance attributes
         self.adcBuffer = np.zeros( (numChannels, numSamples), np.int16 )
         self.dev = None
         self.plotFreq = False
         self.plotFit = False
-        self.wf = []
+        self.wf = Waveframes(self.frame)
 
         self.startWaveFrame()
         
     def startWaveFrame(self):
         for i in range(self.numChannels):
-            thisWf = Waveframe(self.frame, i, portNames[i].split()[0], self.sampleRate, self.figsize)
-            self.wf.append(thisWf)
-            thisWf.pack(side = tk.LEFT )
+            self.wf.addWaveframe(Waveframe(self.wf, i, portNames[i].split()[0], self.sampleRate))
             logger.debug(f"Waveframe {i} has been made")
+        self.wf.packFrames()
+        self.wf.pack()
     
     ##Sets
     def setNumChannels(self, Channels = 4):
@@ -156,14 +155,6 @@ class RFSoC_Daq:
             waveFrame.sampleRate = rate
         logger.debug(f"Sample rate is now {self.sampleRate/10**9} GSPS")
         return f"Sample rate is now {self.sampleRate/10**9} GSPS"
-    def setFigSize(self, sizing = [3,2]):
-        if isinstance(sizing, list):
-            self.figsize = sizing
-            logger.debug(f"The figure size is now {self.figsize}")
-            return f"The figure size is now {self.figsize}"
-        else:
-            logger.debug("Not an appropriate input, please input an list")
-            return 'Not an appropriate input, please input an list'
     def setAdcBuffer(self):
         self.adcBuffer = np.zeros( (theDaq.numChannels, theDaq.numSamples), np.int16 )
         logger.debug("The adcBuffer has been updated")
@@ -171,6 +162,7 @@ class RFSoC_Daq:
     def setPlotFreq(self, Value=True):
         if isinstance(Value, bool):
             self.plotFreq = Value
+            self.wf.plotExtras[0] = Value
             logger.debug(f"{'Plotting' if Value else 'Not plotting'} the frequency")
             return f"{'Plotting' if Value else 'Not plotting'} the frequency"
         else:
@@ -179,6 +171,7 @@ class RFSoC_Daq:
     def setPlotFit(self, Value=True):
         if isinstance(Value, bool):
             self.plotFit = Value
+            self.wf.plotExtras[1] = Value
             logger.debug(f"{'Plotting' if Value else 'Not plotting'} the fitted curve")
             return f"{'Plotting' if Value else 'Not plotting'} the fitted curve"
         else:
@@ -209,70 +202,6 @@ class RFSoC_Daq:
         Value = self.plotFit
         logger.debug(f"You are currently {'Plotting' if Value else 'Not plotting'} the fitted waveform")
         return Value
-    
-    ##Processes
-    def convertToMag(self, yf):
-        N = len(yf)
-        return 2.0/N * np.abs(yf[0:N//2])
-    
-    def calcWave(self, Ch=0):
-        if isinstance(Ch, int) and 0 <= Ch < self.numChannels:
-            signal = self.adcBuffer[Ch]
-            N = len(signal)
-            dt = 1 / self.sampleRate
-            df = 1 / (N * dt)
-            fft_result = fft(signal)
-            xf = np.linspace(0.0, 1.0 / (2 * dt), N // 2)
-            mag_spectrum = np.abs(fft_result[:N//2])
-            phase_spectrum = np.angle(fft_result[:N//2])
-            peak_freq_index = np.argmax(mag_spectrum)
-            frequency = xf[peak_freq_index]
-            amplitude = self.calcPeakToPeakAmp(Ch) # mag_spectrum[peak_freq_index] * 2 / N
-            phase = phase_spectrum[peak_freq_index]
-            # logging.debug(f"Amplitude: {amplitude:.3f} ADC counts || Frequency: {(frequency/10**6):.3f} MHz || Phase: {phase:.3f} rad || Channel: {Ch}")
-            return amplitude, frequency, phase
-        else:
-            raise ValueError('Not an available channel')
-        
-    def calcPeakToPeakAmp(self, Ch = 0):
-        return abs(max(self.adcBuffer[Ch]) - min(self.adcBuffer[Ch]))/2
-    
-    def calcRMS(data):
-        squared_sum = sum((1000*x) ** 2 for x in data)
-        return np.sqrt(squared_sum / len(data))
-        
-    def calcWL(self, Ch=0):
-        if isinstance(Ch, int) and 0<=Ch<self.numChannels:
-            wavelength = speed_of_light/self.calcWave(Ch)[1]
-            logging.debug(f"Wavelength : {wavelength} of Channel : {Ch}")
-            return wavelength
-        else:
-            return 'Not an available channel'
-        
-    ##Prints. For use in the terminal. Don't serve an immense amount of use within the program
-    def printWave(self, Ch=-1):
-        if isinstance(Ch, int) and 0<=Ch<self.numChannels:
-            amplitude, frequency, phase = self.calcWave(Ch)
-            print(f"Amplitude : {amplitude} ADC counts || Frequency : {frequency/10**6} MHz || Channel : {Ch}")
-        elif Ch==-1:
-            for i in range(self.numChannels):
-                amplitude, frequency, phase = self.calcWave(Ch)
-                print(f"Channel {i} : Amplitude : {amplitude} ADC counts || Frequency : {frequency/10**6} MHz")
-        else:
-            return 'Not an available channel'
-        
-    def printWavelength(self, Ch=-1):
-        if isinstance(Ch, int) and 0<=Ch<self.numChannels:
-            wavelength = self.calcWL(Ch)
-            print(f"Wavelength : {wavelength} metres || Channel : {Ch}")
-        elif Ch==-1:
-            for i in range(self.numChannels):
-                wavelength = self.calcWL(Ch)
-                print(f"Channel {i} : Wavelength : {wavelength} metres")
-        else:
-            return 'Not an available channel'
-        
-    ##Methods to save data from the terminal instead of the GUI
     
     def writeCSV(self, fileName, columns, data):
         with open(fileName, mode='w', newline='') as file:
@@ -413,10 +342,11 @@ def Acquire(Channel = 0):
     theDaq.dev.internal_capture(theDaq.adcBuffer,
                                 theDaq.numChannels)
     
-    theDaq.wf[Channel].setWaveform(theDaq.adcBuffer[Channel])
+    theDaq.wf.waveframes[Channel].setWaveform(theDaq.adcBuffer[Channel])
     
     logger.debug("Acquired data")
 
+##This is used for saving data
 def rfsocAcquire():
     if theDaq.dev is None:
         logger.error("No RFSoC device is loaded!")
@@ -425,9 +355,9 @@ def rfsocAcquire():
                                 theDaq.numChannels)
     
     for i in range(theDaq.numChannels):
-        theDaq.wf[i].setWaveform(theDaq.adcBuffer[i])
-        if theDaq.wf[i].toPlot == True:
-            theDaq.wf[i].plot(theDaq.calcWave(i), [theDaq.plotFreq, theDaq.plotFit])
+        theDaq.wf.waveframes[i].setWaveform(theDaq.adcBuffer[i])
+        if theDaq.wf.waveframes[i].toPlot == True:
+            theDaq.wf.waveframes[i].notebook.plot()
             
     logger.debug("Acquired data and Plotted")
     
@@ -492,8 +422,7 @@ def submitSaveName(value):
     logger.debug(f"You are setting the Save Files name to : {SaveName}")
     if SaveName and isinstance(SaveName, str) == False:
         SaveName=str(SaveName)
-    for i in range(theDaq.numChannels):
-        theDaq.wf[i].saveText = SaveName
+    theDaq.wf.saveText = SaveName
     
 ##Toggle action
 def toggle(tg, setFunc):
@@ -505,6 +434,7 @@ def toggle(tg, setFunc):
         setFunc(False)
     return 'Updated plotting'
 
+##This is to easily have both plot options turned off
 def toggleOff():
     if toggles["Freq"].config('relief')[-1] == 'raised':
         toggles["Freq"].config(relief="sunken")
@@ -519,32 +449,32 @@ def contAcquire():
     
 def getEnlargedNotebook():
     index = 0
-    for widget in displayFrame.winfo_children():
-        if widget.enlarged == True:
-            index = widget.index
+    for waveframe in theDaq.wf.waveframes:
+        if waveframe.enlarged == True:
+            index = waveframe.index
     return index
 
 def Save():
     index = getEnlargedNotebook()
     rfsocAcquire()
-    for i in range(100):
+    for i in range(1000):
         print(i)
-        displayFrame.winfo_children()[index].saveWF()
+        theDaq.wf.waveframes[index].saveWF()
         Acquire(index)
-    displayFrame.winfo_children()[index].setSaveWFName()
+    theDaq.wf.waveframes[index].setSaveWFName()
         
 
 def switchToTab(index):
-    for widget in displayFrame.winfo_children():
-        widget.switchToTab(index)
+    for waveframe in theDaq.wf.waveframes:
+        waveframe.notebook.switchToTab(index)
 
 def switchTab():
-    for widget in displayFrame.winfo_children():
-        widget.switchTab()
+    for waveframe in theDaq.wf.waveframes:
+        waveframe.notebook.switchTab()
 
 def switchTabBack():
-    for widget in displayFrame.winfo_children():
-        widget.switchTabBack()
+    for waveframe in theDaq.wf.waveframes:
+        waveframe.notebook.switchTabBack()
 
 ##Miscellaneous
 def getAppropriateFigSize():
@@ -601,8 +531,7 @@ if __name__ == '__main__':
     daq = RFSoC_Daq( displayFrame,
                      numChannels,
                      numSamples,
-                     sampleRate,
-                     figsize)
+                     sampleRate)
     theDaq = daq   
     
     displayFrame.pack( side = tk.TOP )
@@ -671,10 +600,10 @@ if __name__ == '__main__':
     
     root.bind("<Control-f>", lambda event: toggleOff())
         
-    root.bind("<F1>", lambda event: displayFrame.winfo_children()[0].btns['Enlarge'].invoke())
-    root.bind("<F2>", lambda event: displayFrame.winfo_children()[1].btns['Enlarge'].invoke())
-    root.bind("<F3>", lambda event: displayFrame.winfo_children()[2].btns['Enlarge'].invoke())
-    root.bind("<F4>", lambda event: displayFrame.winfo_children()[3].btns['Enlarge'].invoke())
+    root.bind("<F1>", lambda event: theDaq.wf.waveframes[0].btns['Enlarge'].invoke())
+    root.bind("<F2>", lambda event: theDaq.wf.waveframes[1].btns['Enlarge'].invoke())
+    root.bind("<F3>", lambda event: theDaq.wf.waveframes[2].btns['Enlarge'].invoke())
+    root.bind("<F4>", lambda event: theDaq.wf.waveframes[3].btns['Enlarge'].invoke())
     
     root.bind("<F5>", lambda event: buttons['Acquire'].invoke())
     
