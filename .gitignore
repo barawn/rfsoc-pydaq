@@ -1,0 +1,22 @@
+# Ignore .ipynb_checkpoints directories
+.ipynb_checkpoints/
+scrolledlog/.ipynb_checkpoints/
+textconsole/.ipynb_checkpoints/
+waveframe/.ipynb_checkpoints/
+
+# Ignore __pycache__ directories
+__pycache__/
+scrolledlog/__pycache__/
+textconsole/__pycache__/
+waveframe/__pycache__/
+
+# Ignore data directory and its contents
+data/
+
+# Ignore specific files
+temp.py
+waveframe/WaveframeBackup.py
+waveframe/backup.py
+
+# Ignore files with 'backup' in the name
+*backup*
