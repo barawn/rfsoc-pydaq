@@ -2,16 +2,18 @@ import numpy as np
 
 from scipy.fft import fft
 from scipy.optimize import curve_fit
+from scipy.signal import find_peaks, peak_widths, butter, filtfilt, correlate
 
 from typing import List
 
 class Waveform():
     def __init__(self, waveform: List, sampleRate = 3.E9):
         self.waveform = waveform
-        self.timelist = np.arange(len(self.waveform))*(1.E9/sampleRate) ##In Nano Seconds
+        self.sampleRate = sampleRate
+        self.timelist = np.arange(len(self.waveform))/sampleRate
         
         self.N = len(self.waveform)
-        self.dt = self.timelist[1]-self.timelist[0]
+        self.dt = self.timelist[1]-self.timelist[0] ##In Nano Seconds
         
     def updateWaveform():
         pass
@@ -125,6 +127,22 @@ class Waveform():
         Omega = self.fitFrequency * (2*np.pi)
         fit = self.getSine(np.array(self.timelist), Omega, self.fitAmplitude, self.fitPhase, self.fitOffset)
         self.fitDiff = self.calculate_rms((self.waveform-fit)/self.RMS)
+
+
+    def calcPeaks(self):
+        self.peaks, _ = find_peaks(self.waveform, height=400) #the minumum height of a peak. Probably should calculate this or something idk
+
+        self.widths = peak_widths(self.waveform, self.peaks, rel_height=0.5)
+
+    def butterworth(self):
+        nyq = 0.5 * self.sampleRate
+        normal_cutoff = 1.E9 / nyq
+        b, a = butter(5, normal_cutoff, btype='low', analog=False)
+        return b, a
+    
+    def lowpass_filter(self):
+        b, a = self.butterworth()
+        self.filtered_signal = filtfilt(b, a, self.waveform)
         
     def calculate_rms(self, data):
         square_sum = sum(x ** 2 for x in data)

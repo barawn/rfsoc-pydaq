@@ -457,7 +457,7 @@ def getEnlargedNotebook():
 def Save():
     index = getEnlargedNotebook()
     rfsocAcquire()
-    for i in range(1000):
+    for i in range(100):
         print(i)
         theDaq.wf.waveframes[index].saveWF()
         Acquire(index)

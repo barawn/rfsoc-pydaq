@@ -5,7 +5,6 @@ import numpy as np
 #Plotting imports
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
-import matplotlib.pyplot as plt
 
 try:
     from Waveform import Waveform
@@ -73,7 +72,7 @@ class PlotCanvas(FigureCanvasTkAgg):
         
         ax = self.figure.add_subplot(111)
         
-        ax.plot(self.waveform.timelist, self.waveform.waveform)
+        ax.plot(self.waveform.timelist*10**9, self.waveform.waveform)
         
         ax.set_title(self.title)
         ax.set_xlabel('time (ns)')
@@ -91,64 +90,68 @@ class PlotCanvas(FigureCanvasTkAgg):
         except:
             self.waveform.setWaveFFT()
             
-        stats_text = f"RMS : {self.waveform.RMS:.2f} ADC Counts\nFrequency : {self.waveform.frequencyFFT} MHz\nOffset : {self.waveform.offset} ADC Counts"
+        stats_text = f"RMS : {self.waveform.RMS:.2f} ADC\nFrequency : {self.waveform.frequencyFFT*10**(-6):.2f} MHz\nOffset : {self.waveform.offset:.2f} ADC"
         
-        ax.text(0.95, 0.95, stats_text, verticalalignment='top', horizontalalignment='right',
-                 transform=plt.gca().transAxes, bbox=dict(facecolor='white', alpha=0.7))
+        ax.text(0.97, 0.97, stats_text, verticalalignment='top', horizontalalignment='right',
+            transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.5))
         
 
         self.draw()
 
     def plotFFT(self):
+        self.figure.clear()
+        
         self.waveform.doFFTs()
         
         axFreq = self.figure.add_subplot(111)
         
-        axFreq.plot(self.waveform.xf, self.waveform.mag_spectrum, label='scipy FFT')
+        axFreq.plot(self.waveform.xf*10**(-6), self.waveform.mag_spectrum, label='scipy FFT')
         
         axFreq.set_title(self.title)
         axFreq.set_xlabel("Frequency (MHz)")
         axFreq.set_ylabel("Magnitude (arb.)")
         
-        axFreq.legend(loc='upper right')
+        # axFreq.legend(loc='upper right')
         
-        stats_text = f"Frequency : {self.waveform.frequencyFFT} MHz\nAmplitude : {self.waveform.amplitudeFFT} ADC Counts\n"
+        stats_text = f"Frequency : {self.waveform.frequencyFFT*10**(-6):.2f} MHz\nAmplitude : {self.waveform.amplitudeFFT:.2f} ADC"
         
-        axFreq.text(0.95, 0.95, stats_text, verticalalignment='top', horizontalalignment='right',
-                 transform=plt.gca().transAxes, bbox=dict(facecolor='white', alpha=0.7))
+        axFreq.text(0.97, 0.97, stats_text, verticalalignment='top', horizontalalignment='right',
+            transform=axFreq.transAxes, bbox=dict(facecolor='white', alpha=0.5))
         
         self.draw()
     
     def plotFit(self):
+        self.figure.clear()
+        
         self.waveform.setSineFit()
         
         axFit = self.figure.add_subplot(111)
         axFit.plot(self.waveform.timelist, self.waveform.waveform, alpha = 0.5, label='Data')
-        axFit.plot(self.waveform.timelist, self.waveform.getSine(self.waveform.timelist,self.waveform.fitFrequency,self.waveform.fitAmplitude,self.waveform.fitPhase,self.waveform.fitOffset), label='Fit')
+        axFit.plot(self.waveform.timelist, self.waveform.getSine(self.waveform.timelist,self.waveform.fitFrequency*2*np.pi,self.waveform.fitAmplitude,self.waveform.fitPhase,self.waveform.fitOffset), label='Fit')
         axFit.set_title(self.title)
-        axFit.set_xlabel('time (ns)')
+        axFit.set_xlabel('time (s)')
         axFit.set_ylabel('ADC Counts', labelpad=-3.5)
         
         axFit.axhline(y=self.waveform.fitOffset, color='black', linestyle='--', linewidth=0.5, label='Offset Line')
         axFit.axhline(y=self.waveform.fitAmplitude+self.waveform.fitOffset, color='red', linestyle='--', linewidth=0.3, label='Amplitude Line')
         axFit.axhline(y=-self.waveform.fitAmplitude+self.waveform.fitOffset, color='red', linestyle='--', linewidth=0.3)
 
-        axFit.legend(loc='upper right')
+        # axFit.legend(loc='center right')
         
         try:
             self.waveform.fitDiff
         except:
             self.waveform.compareToFit()
             
-        stats_text = f"Data\nFrequency : {self.waveform.frequencyFFT} MHz\nAmplitude : {self.waveform.amplitudeFFT} ADC Counts\nOffset : {self.waveform.offset} ADC Counts"
+        stats_text = f"Data                               \nFrequency : {self.waveform.frequencyFFT*10**(-6):.2f} MHz\nAmplitude : {self.waveform.amplitudeFFT:.2f} ADC\nOffset : {self.waveform.offset:.2f} ADC"
         
-        axFit.text(0.95, 0.95, stats_text, verticalalignment='top', horizontalalignment='right',
-                 transform=plt.gca().transAxes, bbox=dict(facecolor='white', alpha=0.7))
+        axFit.text(0.97, 0.97, stats_text, verticalalignment='top', horizontalalignment='right',
+            transform=axFit.transAxes, bbox=dict(facecolor='white', alpha=0.5))
             
-        stats_text_fit = f"Fit\nFrequency : {self.waveform.fitFrequency} MHz\nAmplitude : {self.waveform.fitAmplitude} ADC Counts\nOffset : {self.waveform.fitOffset} ADC Counts\n'Fit Quality' : {self.waveform.fitDiff}"
+        stats_text_fit = f"Fit                                \nFrequency : {self.waveform.fitFrequency*10**(-6):.2f} MHz\nAmplitude : {self.waveform.fitAmplitude:.2f} ADC\nOffset : {self.waveform.fitOffset:.2f} ADC\n'Fit Quality' : {self.waveform.fitDiff*100:.2f} Arb"
         
-        axFit.text(0.95, 0.2, stats_text_fit, verticalalignment='top', horizontalalignment='right',
-                 transform=plt.gca().transAxes, bbox=dict(facecolor='white', alpha=0.7))
+        axFit.text(0.97, 0.01, stats_text_fit, verticalalignment='bottom', horizontalalignment='right',
+            transform=axFit.transAxes, bbox=dict(facecolor='white', alpha=0.5))
         
         self.draw()
 

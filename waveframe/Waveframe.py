@@ -104,14 +104,14 @@ class Waveframe(tk.Frame):
     
     #Saving
     
-    def saveName(self, subdir, fileType):
+    def saveName(self, fileType):
         #Needs better automatic naming system
-        directory = "/home/xilinx/rfsoc-pydaq/data/"
+        directory = f"/home/xilinx/rfsoc-pydaq/data/{self.parent.datatype}/{self.parent.directory}/"
         fileName = ""
         if self.parent.saveText:
-            fileName = subdir + self.title + "_" + self.parent.saveText + fileType
+            fileName = self.title + "_" + self.parent.saveText + fileType
         else:
-            fileName = subdir + self.title + "_" + datetime.now().strftime("%H-%M-%S_%d-%m-%Y") + fileType
+            fileName = self.title + "_" + datetime.now().strftime("%H-%M-%S_%d-%m-%Y") + fileType
         path = directory+fileName
         logger.debug(f"Saving file to {path}")
         return path
@@ -145,8 +145,9 @@ class Waveframe(tk.Frame):
         self.setSaveWFName()
     
     def saveWF(self):               ##This method will also be run in main program on a loop
-        directory = "testConsistency"
-        path = f"/home/xilinx/rfsoc-pydaq/data/{directory}/dummy.csv"
+        # datatype = "pulse"
+        # directory = "data"
+        path = f"/home/xilinx/rfsoc-pydaq/data/{self.parent.datatype}/{self.parent.directory}/dummy.csv"
         
         data = list(zip(self.notebook.waveform.timelist, self.notebook.waveform.waveform))
         
@@ -160,12 +161,13 @@ class Waveframe(tk.Frame):
     
     
     def setSaveWFName(self):        ##This saves the waveframe with the appropriate name, more like save waveform to name
-        directory = "testConsistency"
-        pathTemp = f"/home/xilinx/rfsoc-pydaq/data/{directory}/dummy.csv"
+        # datatype = "pulse"
+        # directory = "data"
+        pathTemp = f"/home/xilinx/rfsoc-pydaq/data/{self.parent.datatype}/{self.parent.directory}/dummy.csv"
         with open(pathTemp, 'r') as temp_file:
             temp_data = temp_file.readlines()
             
-        path = self.saveName(f"{directory}/", ".csv")
+        path = self.saveName(".csv")
 
         with open(path, 'w', newline='') as new_file:
             new_file.writelines(temp_data)

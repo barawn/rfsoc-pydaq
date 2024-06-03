@@ -6,6 +6,7 @@ from scipy.fft import fft
 from scipy.optimize import curve_fit
 from datetime import datetime
 import csv
+from screeninfo import get_monitors
 
 #System Imports
 import logging
@@ -55,11 +56,18 @@ class Waveframes(tk.Frame):
         
         self.plotExtras = [False, False] ##To plot the FFT and fit
         self.saveText = "Temp"
-        self.saveDir = "temp"
+        self.datatype = "pulse"
+        self.directory = "testWidth"
         
-        
-        screen_width = self.parent.winfo_screenwidth()
-        screen_height = self.parent.winfo_screenheight()
+        monitors = get_monitors()
+        main_display = monitors[0]
+
+        screen_width = main_display.width
+        screen_height = main_display.height
+
+        # screen_width = self.parent.winfo_screenwidth()
+        # screen_height = self.parent.winfo_screenheight()
+
         self.figsize=(screen_width/(100*4), screen_height/250)
         # self.figsize=(screen_width/(2000), screen_height/1000)
         
