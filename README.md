@@ -51,24 +51,68 @@ embedded into a Python module yet.
 
 ![Screenshot of RFSoC-PyDaq Running](https://github.com/pueo-pynq/rfsoc-pydaq/blob/Hugo/pydaqimage.png)
 
-DisplayFrame:
-* Notebooks can plot the raw wavefrom but also the frequency fft and very rudamentary fitted plot (looks worse in photo due to putting low frequency through high frequency balun, so small signal).
-* The plots have labels, legends and potentially stats boxes.
-* Each Notebook comes with 4 buttons. SaveWF saves the data to a csv file, SavePlt saves the canvas (very slow in TKinter, this enlarges the frame and then resets), Enlarge is a toggle that enlarges the specified Notebook and blocks other canvases from plotting and 'Plot?' toggles whether the notebook plots.
+### Features:
+StartUp:
+* One can run rfsoc-pydaq from anywhere start location (obviously with the appropriate path)
+* It will automatically load the zcu bitstream upon startup
+* The Frame sizing should be automatic but this has only been tested on a limited displays
 
-buttonFrame:
-* No real change but now automatically loads in zcuMTS.
+MainButtons:
+* I do not know if load works if something is automatically loaded
+* The Acquire hotkey (F5) or button will run an internal capture
+* User doesn't do anythinf
+* I couldn't get restart to work, so it doesn't do anything
+* Save will save 100 waveforms of the 1st packed Waveframe display. It will plot 1.
 
-toggleFrame:
-* This toggles whether the frequency fft and Fitted curve should be plotted, these can ~double the Acquire time.
+ExtraButtons:
+* Freq/Fit toggle buttons toggle whether after an internal capture the Frequnecy spectrum FFT and Sine Curve Fit is plotted. This (especially the fit) make running the acquire method take much longer. (Plotting in TKinter is the most time consuming process)
 
-submitFrame:
-* You can change the sample size, only exponents of two since a lot of different inputs of 2 lead to pretty hard crashes (max 14). Don't know why but odd exponents seem to work better.
-* Set the file name to save to. Files are saved automatically starting with the full channel name. Afterwards either the date horribly formatted or whatever is typed here. If this is falsey it will go back to the awkward time naming. This name will be for all Notebooks
-* Can now press enter to submit the field 
+* Set SampleSize allows you to change the sample size as 2^(2 to 14). 
+* Set Filename allows you to change the name of the file to be saved. This should be global to the GUI. The pathing may be different depending on the save method. To save say 200_100 you'd have to type "200_100". The scrolled log should output the change
 
-consoleFrame:
-* A few new built in methods in the RFSoC_Daq can be accessed here. Most useful ones are automatically run for display
+### Waveform:
+This was just an easier way of being able to do anything with the ADC buffer data from an internal capture. Each Internal capture will create a Waveform instance. 
 
-logFrame:
-* Many new features will give a log output but some will only do this in the terminal you run ./run-rfsoc-pydaq.sh
+This is full of mainly pointless methods. Since most of this should be done in subsequent analysis I've done the terrible practice of initialising instance variables within methods, since an individual waveform instance is unlikley to be running multiple methods and doesn't need all the bloat of unnessasary instance variables.
+
+This is where all of handling of the ADC buffer data should be handled
+
+### Waveframes:
+This is a colllection of individual Waveframe. It's main job is just to handle the packing of a Waveframe and store variables that should be the same for each WaveFrame such as the same name
+
+
+#### Waveframe
+This is where the recorded data is displayed. Each Waveframe is made up of a Notebook and a button frame.
+
+#### Notebook
+Notebook allows on to have multiple tabs on a display GUI. The plots are controlled by PlotDisplay and PlotCanvas
+
+#### PlotDisplay
+This is only necessary to add a canvas to the Notebook. The canvas needs to be within a frame and the frame needs to be added in a particular way. This should automatically do this
+
+#### PlotCanvas
+Populate with methods to plot whatever you want. Each individual method is for a single plot
+
+### Waveframe button frame
+* SaveWF will save the adc buffer data for that specific waveform sample from the selected ADC channel. The name is detemined by the set filename submit widget
+* SavePlt will save the currently open canvas open in the notebook. So either the waveform, FFT, fit etc. To make the image better it will launch the enlarge button. This process takes way longer than one might think. Saving is clearly finised when the Waveframes are repacked as normal. This should save to a Figures directory in data directory.
+* Enlarge just allows one to focus on a single channel. The other channel Waveframe instances will be unpakced and won't plot and the chosen channels display will fill the screen. If you are only using one channel this is significantly quicker.
+* Plot? toggle whether you want a channels display to plot. Again plotting takes the longest time.
+
+
+## Notes for the user
+
+Most things can be accessed through the GUI. However the user currently has to change within the code:
+* The number of saved waveforms (should be 100 atm)
+* The saved directory of the saved waveforms
+
+## Adding to existing
+To add a new frame to notebooks
+* Within the Notebook constructor add
+self.what-frame-will-do_frame = PlotDisplay(self, figsize, "Name of tab in notebook", self.waveform)
+* Ensure the waveform is set in method setWaveform
+self.what-frame-will-do_frame.updateWaveform(self.waveform)
+* Write a plot method within PlotCanvas
+* Make sure that the Notebooks plot method is ammended to ensure that it is plotted
+
+
