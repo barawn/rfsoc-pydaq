@@ -97,8 +97,8 @@ class Waveframe(tk.Frame):
         self.user_callback = None
     
     def setWaveform(self, data):
-        waveform = Waveform(data)
-        self.notebook.setWaveform(waveform)
+        self.waveform = Waveform(data)
+        self.notebook.setWaveform(self.waveform)
 
     ##Buttons
     

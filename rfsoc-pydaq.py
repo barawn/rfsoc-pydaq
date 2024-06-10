@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 #Establishing base values for parameters
 default_numChannels = 4
-default_numSamples = 2048
+default_numSamples = 2**5
 default_sampleRate = 3.E9
 
 numChannels = 4
@@ -111,28 +111,89 @@ class RFSoC_Daq:
                  frame: tk.Frame,
                  numChannels: int = 4,
                  numSamples: int = 2048,
-                 sampleRate = 3.E9):
+                 sampleRate = 3.E9,
+                 channelName = ["","","",""]):
         
         #Inputs
         self.frame = frame
         self.numChannels = numChannels
         self.numSamples = numSamples
         self.sampleRate = sampleRate
+        self.channelName = channelName
         #Inititalising instance attributes
         self.adcBuffer = np.zeros( (numChannels, numSamples), np.int16 )
         self.dev = None
         self.plotFreq = False
         self.plotFit = False
-        self.wf = Waveframes(self.frame)
+        self.wf = Waveframes(self.frame, self.numChannels)
+
+        self.sdv = None
 
         self.startWaveFrame()
         
     def startWaveFrame(self):
         for i in range(self.numChannels):
-            self.wf.addWaveframe(Waveframe(self.wf, i, portNames[i].split()[0], self.sampleRate))
+            self.wf.addWaveframe(Waveframe(self.wf, i, self.channelName[i].split()[0], self.sampleRate))
             logger.debug(f"Waveframe {i} has been made")
         self.wf.packFrames()
         self.wf.pack()
+
+    ##AGC core stuff
+
+    def getDiff(self):
+        gt = self.sdv.read(0x8)
+        lt = self.sdv.read(0xc)
+        return gt-lt
+
+    def runAgc(self):
+        self.sdv.write(0,0x4)
+        self.sdv.write(0,0x1)
+        while ((self.sdv.read(0) & 0x2)==0):
+            pass
+
+    def printDiff(self, offset=None):
+        arr = []
+        for i in range(1000):
+            self.runAgc()
+            arr.append(self.getDiff())
+        print(offset, np.mean(arr))
+        return offset, np.mean(arr)
+    
+    def printAll(self):
+        for i in range(100):
+            self.setOffset(i*10)
+            self.printDiff(i*10)
+
+    def getAdc(self, ch=0):
+        return self.adcBuffer[ch]/256 - 15.5
+    
+    def patrick(self):
+        self.runAgc()
+        out = self.getAdc(0)
+
+        a = np.sqrt(np.average((np.square(out))))
+        b = np.sqrt(self.sdv.read(0x4)/131072)
+
+        return a, b
+
+    def mp(self):
+        arr = []
+        for i in range(1000):
+            a, b = self.patrick()
+            arr.append(a-b)
+        return np.average(arr)
+
+    def pm(self):
+        arr = []
+        for i in range (700):
+            self.setScaling(i*10+3000)
+            arr.append(self.mp())
+            print(arr[-1])
+        try:
+            self.writeToCSV("home/xilinx/rfsoc-pydaq/data/scale_change.csv", arr)
+        except:
+            print("The CSV writting on this thing is fucked")
+
     
     ##Sets
     def setNumChannels(self, Channels = 4):
@@ -177,7 +238,42 @@ class RFSoC_Daq:
         else:
             logger.debug("Please input a valid option")
             return"Please input a valid option"
+        
+    def setSDV(self, sdv):
+        self.sdv = sdv
     
+    def setScaling(self, Value=80):
+        if isinstance(Value, int):
+            try:
+                self.sdv.write(0x14, Value)
+                self.sdv.write(0x00, 0x300)
+                self.sdv.write(0x00, 0x400)
+
+                logger.debug(f"The offset has been set to {Value}")
+                return f"The offset has been set to {Value}"
+        
+            except:
+                logger.debug("It would appear that you don't have a sdv loaded in")
+        else:
+            logger.debug("Please input a valid option")
+            return "Please input a valid option"
+
+    def setScaling(self, Value=4096):
+        if isinstance(Value, int):
+            try:
+                self.sdv.write(0x10, Value)
+                self.sdv.write(0x00, 0x300)
+                self.sdv.write(0x00, 0x400)
+
+                logger.debug(f"The scaling has been set to {Value}")
+                return f"The scaling has been set to {Value}"
+        
+            except:
+                logger.debug("It would appear that you don't have a sdv loaded in")
+        else:
+            logger.debug("Please input a valid option")
+            return "Please input a valid option"
+
     ##Gets
     def getNumChannels(self):
         logger.debug(f"You are recording from {self.numChannels} channels")
@@ -202,6 +298,19 @@ class RFSoC_Daq:
         Value = self.plotFit
         logger.debug(f"You are currently {'Plotting' if Value else 'Not plotting'} the fitted waveform")
         return Value
+
+    def getWaveform(self, ch=0):
+        try:
+            return theDaq.wf.waveframes[0].waveform
+        except:
+            print("Appears the waveform hasn't ben instantiated")
+            logger.debug("Appears the waveform hasn't ben instantiated")
+            return 0
+
+    def writeToCSV(self, fileName, data):
+        with open(fileName, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerows(data)
     
     def writeCSV(self, fileName, columns, data):
         with open(fileName, mode='w', newline='') as file:
@@ -231,6 +340,12 @@ class RFSoC_Daq:
             writer.writerows(data)  
         logger.debug("Waveform data saved")
         return 'Saved Waveform'
+
+    def calculate_rms(self, data):
+        square_sum = sum(x ** 2 for x in data)
+        mean_square = square_sum / len(data)
+        rms = np.sqrt(mean_square)
+        return rms
     
     def printHotkeys(self):
         print("Hotkeys:\nf1-4 : Toggle Enlarge on Channel 0-3\n\nf5 : Invokes Acquire Method\n\nCtrl+s : Invoke Save buttons method\nCtrl+p : Saves plot of enlarged canvas\nCtrl+f : Toggle both the freq and fit off\n\nf9-12 : Switch all Notebook tabs to index 0-3\nPage Up and Page Down : Toggle up and down in notebook tabs\n")
@@ -243,7 +358,6 @@ class RFSoC_Daq:
     ##Highly effected by the sample rate and kinda factors into the jankyness
     
     #You need better analysis tools
-
 
 def defaultUserCommand():
     logger.debug("Default Command Called")
@@ -333,8 +447,16 @@ def rfsocLoad(hardware = ""):
     sys.path = curpath
     logger.debug("Going back to original directory %s" % curdir)
     os.chdir(curdir)
+
+    try:
+        from serialcobsdevice import SerialCOBSDevice
+        theDaq.setSDV(SerialCOBSDevice('/dev/ttyPS1', 1000000))
+    except:
+        logger.debug("It would appear the overloay you have tried to load doesn't contain SerialCOBSDevice")
+
     return
 
+##This was for saving but I guess is now used for testing
 def Acquire(Channel = 0):
     if theDaq.dev is None:
         logger.error("No RFSoC device is loaded!")
@@ -346,7 +468,6 @@ def Acquire(Channel = 0):
     
     logger.debug("Acquired data")
 
-##This is used for saving data
 def rfsocAcquire():
     if theDaq.dev is None:
         logger.error("No RFSoC device is loaded!")
@@ -364,8 +485,10 @@ def rfsocAcquire():
 def ContAcquire():
     return 'Not complete'
 
-##Buttons
-##Simply retrieves the value from an input 'entry' box connected to a submit button
+########################################################
+############################Buttons
+########################################################
+##Simply retrieves the value from an input 'entry' box connected to a submit button (not an actual button)
 def getSubmitInput(value, needNumber):
     if isinstance(value, object):
         logger.debug("Passed in an object, attempting to .entry.get()")
@@ -381,7 +504,9 @@ def getSubmitInput(value, needNumber):
         result = value
     return result
 
+############################
 ##Action for submit butttons
+############################
 def submitNumSamples(value = 11):
     NSamp = getSubmitInput(value, True)
     logger.debug(f"Currently have {theDaq.numSamples} samples, you have inputted {2**NSamp} samples")
@@ -423,8 +548,17 @@ def submitSaveName(value):
     if SaveName and isinstance(SaveName, str) == False:
         SaveName=str(SaveName)
     theDaq.wf.saveText = SaveName
+
+def submitScalingValue(value):
+    ScalingValue = getSubmitInput(value, True)
+    logger.debug(f"You are setting the scaling to: {ScalingValue}")
+    theDaq.setScaling(ScalingValue)
     
-##Toggle action
+############################
+##Toggles
+############################
+
+## Toggle method
 def toggle(tg, setFunc):
     if tg.config('relief')[-1] == 'sunken':
         tg.config(relief="raised")
@@ -434,7 +568,7 @@ def toggle(tg, setFunc):
         setFunc(False)
     return 'Updated plotting'
 
-##This is to easily have both plot options turned off
+##This is to easily have both plot options turned off with a hotkey
 def toggleOff():
     if toggles["Freq"].config('relief')[-1] == 'raised':
         toggles["Freq"].config(relief="sunken")
@@ -443,10 +577,15 @@ def toggleOff():
         toggles["Fit"].config(relief="sunken")
         theDaq.setPlotFit(False)
 
+##Haven't implemented this but tbh how tkinter plots this would be absolutely horrible
 def contAcquire():
     toggle()
-    
-    
+
+############################
+##Widget Bollocks
+############################
+
+##This is basically to decide which waveframe to save the raw adc count data for
 def getEnlargedNotebook():
     index = 0
     for waveframe in theDaq.wf.waveframes:
@@ -454,6 +593,7 @@ def getEnlargedNotebook():
             index = waveframe.index
     return index
 
+## This instantiates saving the 
 def Save():
     index = getEnlargedNotebook()
     rfsocAcquire()
@@ -476,30 +616,32 @@ def switchTabBack():
     for waveframe in theDaq.wf.waveframes:
         waveframe.notebook.switchTabBack()
 
+############################
 ##Miscellaneous
+############################
 def getAppropriateFigSize():
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
     return (screen_width/(100*theDaq.numChannels),screen_height/250)
 
 ##This currently doesn't do what I want
-##This doesn't account for zocl not restarting
+##This doesn't account for zocl not restarting. Fuck zocl...
 def reload_script():
     print("Trying to restart")
     python = sys.executable
     script = os.path.abspath(sys.argv[0])
     
     os.execl(python, python, script)
-        
-##This just a method for a slider that can be ignored
-def degis(value):
-    global buton
-    if(value == "1"):
-        buton["label"] = "  On"
-    else:
-        buton["label"] = "  Off"
     
 if __name__ == '__main__':
+    config = configparser.ConfigParser()
+    config.read("rfsoc-pydaq.ini")
+
+    if 'rfsoc_pydaq' not in config:
+        config['rfsoc_pydaq'] = {}
+
+    pydaq_cfg = config['rfsoc_pydaq']
+
     root = tk.Tk()
     
     screen_width = root.winfo_screenwidth() * sizeEditor[0]
@@ -529,9 +671,14 @@ if __name__ == '__main__':
                         borderwidth = 1)
 
     daq = RFSoC_Daq( displayFrame,
-                     numChannels,
-                     numSamples,
-                     sampleRate)
+                     pydaq_cfg.getint('numChannels',
+                                      fallback=default_numChannels),
+                     pydaq_cfg.getint('numSamples',
+                                      fallback=default_numSamples),
+                     pydaq_cfg.getfloat('sampleRate',
+                                        fallback=default_sampleRate),
+                     pydaq_cfg.getfloat('channels',
+                                        fallback=portNames))
     theDaq = daq   
     
     displayFrame.pack( side = tk.TOP )
@@ -563,10 +710,6 @@ if __name__ == '__main__':
     buttons['User'].pack( side = tk.LEFT )
     buttons['Restart'].pack( side = tk.LEFT )
     buttons['Save'].pack( side = tk.LEFT )
-
-    #A slider that works (as a piece of GUI) but don't have a use for currently
-    # buton = tk.Scale(orient = tk.HORIZONTAL,length = 50,to = 1,showvalue = False,sliderlength = 25,label = "  Off",command = degis)
-    # buton.pack()
     
     buttonFrame.pack( side = tk.TOP )
 
@@ -591,9 +734,14 @@ if __name__ == '__main__':
     buttons['SetSampleSize'] = submitButton(submitFrame, "Set Sample Number (exponent of 2):", sampleExponent, lambda: submitNumSamples(buttons['SetSampleSize']), (1,14))
     # buttons['SetSampleRate'] = submitButton(root, submitFrame, "Set Sample Rate (Redundant):", sampleRate, lambda: submitSampleRate(buttons['SetSampleRate']))
     # buttons['SetChannelCount'] = submitButton(root, submitFrame, "Set Number of Channels:", numChannels, lambda: submitNumberOfChannels(buttons['SetChannelCount']))
-    buttons['SetSaveText'] = submitButton(submitFrame, "Set the FileName:", "Temp", lambda: submitSaveName(buttons['SetSaveText']))   
+    buttons['SetSaveText'] = submitButton(submitFrame, "Set the FileName:", "Temp", lambda: submitSaveName(buttons['SetSaveText']))
+    buttons['SetScaling'] = submitButton(submitFrame, "Set the scaling:", "", lambda: submitScalingValue(buttons['SetScaling']))
     
     submitFrame.pack( side = tk.TOP )
+
+    ############################
+    ## Hotkeys
+    ############################
         
     root.bind("<Control-s>", lambda event: buttons['Save'].invoke())
     root.bind("<Control-p>", lambda event: displayFrame.winfo_children()[getEnlargedNotebook()].btns['SavePlt'].invoke())

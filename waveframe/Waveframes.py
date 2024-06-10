@@ -46,7 +46,8 @@ class Waveframes(tk.Frame):
     Also certain attributes are the same for all individual waveframes and don't need multiple (i.e. 4) initialisations
     '''
     def __init__(self,
-                 parent: tk.Frame):
+                 parent: tk.Frame,
+                 numChannels: int):
         super().__init__(parent)
         
         self.parent = parent
@@ -68,7 +69,7 @@ class Waveframes(tk.Frame):
         # screen_width = self.parent.winfo_screenwidth()
         # screen_height = self.parent.winfo_screenheight()
 
-        self.figsize=(screen_width/(100*4), screen_height/250)
+        self.figsize=(screen_width/(100*numChannels), screen_height/250)
         # self.figsize=(screen_width/(2000), screen_height/1000)
         
     ##Framing        
