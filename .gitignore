@@ -12,6 +12,7 @@ waveframe/__pycache__/
 
 # Ignore data directory and its contents
 data/
+old/
 
 # Ignore specific files
 temp.py

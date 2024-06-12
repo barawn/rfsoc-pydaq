@@ -55,7 +55,7 @@ class PlotCanvas(FigureCanvasTkAgg):
     Plotting the FFT spectrum of the waveform
     Plotting a sinusoidal fitted plot
     '''
-    def __init__(self, display: ttk.Frame, figsize: tuple, title: str, waveform: Waveform, **kwargs):
+    def __init__(self, display: ttk.Frame, figsize: tuple, title: str, waveform: Waveform):
         self.figure = Figure(figsize=figsize)
         super().__init__(self.figure, display)
         

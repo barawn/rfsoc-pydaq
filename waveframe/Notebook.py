@@ -1,25 +1,12 @@
 ##Python Imports
 import tkinter as tk
-from tkinter import ttk, PhotoImage
+from tkinter import ttk
 import numpy as np
-from scipy.fft import fft, ifft, fftfreq
-from scipy.constants import speed_of_light
-from scipy.optimize import curve_fit
-from datetime import datetime
-import csv
 
 #System Imports
 import logging
-from PIL import Image, ImageDraw
-import io
 
 logger = logging.getLogger(__name__)
-
-#Plotting imports
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk
-from matplotlib.backend_bases import key_press_handler
-from matplotlib.figure import Figure
 
 try:
     from PlotDisplay import PlotDisplay
@@ -64,17 +51,13 @@ class Notebook(ttk.Notebook):
         self.time_frame = PlotDisplay(self, figsize, "time", self.waveform)
         
         self.fft_frame = PlotDisplay(self, figsize, "fft", self.waveform)
-        
-        self.fit_frame = PlotDisplay(self, figsize, "fit", self.waveform)
-        
-        self.user_frame = PlotDisplay(self, figsize, "user", self.waveform)
+
+        self.frameArr = [self.time_frame, self.fft_frame]
         
     def setWaveform(self, data: Waveform):
         self.waveform = data
-        self.time_frame.updateWaveform(self.waveform)
-        self.fft_frame.updateWaveform(self.waveform)
-        self.fit_frame.updateWaveform(self.waveform)
-        self.user_frame.updateWaveform(self.waveform)
+        for frame in self.frameArr:
+            frame.updateWaveform(self.waveform)
         
     def plot(self):
         
@@ -83,13 +66,9 @@ class Notebook(ttk.Notebook):
             self.time_frame.display.plotWaveForm()
             
             ##Plotting additional optional plots. These more than double the aqcuire time so making them optional is nice
-            if self.frame.parent.plotExtras[0]:
+            if self.frame.parent.plotExtras["fft"]:
                 self.fft_frame.display.plotFFT()
-                
-            if self.frame.parent.plotExtras[1]:
-                self.fit_frame.display.plotFit()
 
-    
     ##Notebook tab stuff
     def switchToTab(self, index):
         self.select(index)
@@ -124,20 +103,15 @@ class Notebook(ttk.Notebook):
 
         return other_canvases
     
-    
     ##Canvas Sizing
         
     def ShrinkNotebook(self):
-        self.time_frame.display.get_tk_widget().config(width=self.figsize[0]*100, height = self.figsize[1]*100)
-        self.fft_frame.display.get_tk_widget().config(width=self.figsize[0]*100, height = self.figsize[1]*100)
-        self.fit_frame.display.get_tk_widget().config(width=self.figsize[0]*100, height = self.figsize[1]*100)
-        self.user_frame.display.get_tk_widget().config(width=self.figsize[0]*100, height = self.figsize[1]*100)
+        for frame in self.frameArr:
+            frame.display.get_tk_widget().config(width=self.figsize[0]*100, height = self.figsize[1]*100)
         
     def EnlargeNoteBook(self):
-        self.time_frame.display.get_tk_widget().config(width = self.figsize[0]*400 , height = self.figsize[1]*130)
-        self.fft_frame.display.get_tk_widget().config(width = self.figsize[0]*400 , height = self.figsize[1]*130)
-        self.fit_frame.display.get_tk_widget().config(width = self.figsize[0]*400 , height = self.figsize[1]*130)
-        self.user_frame.display.get_tk_widget().config(width = self.figsize[0]*400 , height = self.figsize[1]*130)
+        for frame in self.frameArr:
+            frame.display.get_tk_widget().config(width = self.figsize[0]*self.frame.parent.numChannels*100 , height = self.figsize[1]*130)
         
 if __name__ == "__main__":
     

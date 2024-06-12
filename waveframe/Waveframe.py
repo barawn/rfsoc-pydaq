@@ -1,9 +1,6 @@
 ##Python Imports
 import tkinter as tk
-from tkinter import ttk
 import numpy as np
-from scipy.fft import fft
-from scipy.optimize import curve_fit
 from datetime import datetime
 import csv
 
@@ -14,20 +11,14 @@ import io
 
 logger = logging.getLogger(__name__)
 
-#Plotting imports
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from matplotlib.figure import Figure
-
 try:
     from Notebook import Notebook
-    from PlotDisplay import PlotDisplay
     from Waveform import Waveform
 except:
     pass
 
 try:
     from .Notebook import Notebook
-    from .PlotDisplay import PlotDisplay
     from .Waveform import Waveform
 except:
     pass
@@ -57,11 +48,10 @@ class Waveframe(tk.Frame):
     def __init__(self,
                  parent: tk.Frame,
                  index: int,
-                 title,
-                 sampleRate=3.E9):
+                 title):
         
         self.parent = parent
-        self.sampleRate = sampleRate
+        self.sampleRate = 3.E9
         self.index = index
         self.title = title
         
@@ -100,8 +90,6 @@ class Waveframe(tk.Frame):
         self.waveform = Waveform(data)
         self.notebook.setWaveform(self.waveform)
 
-    ##Buttons
-    
     #Saving
     
     def saveName(self, fileType):
@@ -235,11 +223,20 @@ class Waveframe(tk.Frame):
         return f'Not plotting frame {self.title}'   
     
 if __name__ == "__main__":
+
+    from Waveframes import Waveframes
     
     root = tk.Tk()
-    wf = []
-    for i in range(4):
-        wf.append(Waveframe(root, i, str(i), 3.E9, (3,2)))
-        wf[-1].pack(side = tk.LEFT )
+    
+    numChannels = 1
+
+    setofframes = Waveframes(root, numChannels)
+    
+    for i in range(numChannels):
+        setofframes.addWaveframe(Waveframe(setofframes, i, str(i)))
+    
+    
+    setofframes.pack()
+    setofframes.packFrames()
     
     root.mainloop()
