@@ -61,7 +61,10 @@ class AGC_Daq(RFSoC_Daq):
         self.applyAGC()
 
     def runAGC(self):
-        pass
+        self.sdv.write(0,0x4)
+        self.sdv.write(0,0x1)
+        while ((self.sdv.read(0) & 0x2) == 0):
+            pass
 
     ############################
     ##Sets
@@ -121,11 +124,16 @@ class AGC_Daq(RFSoC_Daq):
         logger.debug(f"The Scaling is currently set to {scaling}")
         return scaling
     
+    def getAdc(self, ch = 0):
+        return self.adcBuffer[ch]/256 - 15.5
+    
     def getAccumulator(self):
         return self.sdv.read(0x4)
     
     def getTailDiff(self):
-        pass
+        gt = self.sdv.read(0x8)
+        lt = self.sdv.read(0xc)
+        return gt-lt
 
     ############################
     ##App
