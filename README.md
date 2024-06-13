@@ -53,6 +53,8 @@ One should run with root. Can use sudo -i to get to root.
 
 Running app.py, will launch the TKinter GUI with the RFSoC_Daq class embedded.
 
+Use app.py -c {the name of your config} to apply a specific configurations (such as app.py -c "agc") 
+
 This is the super Daq class that contains all the useful basics for all firmware overlays loaded into the daq.dev
 
 The Daq class will store the Waveframes class that holds multiple Waveframe classes. These waveframe classes store the core GUI of the DAQ. The waveframe most importantly contains a tk.Notebook class called Notebook which will automatically manage, pack and dipslay plots that it gets from the PlotDipslay class that holds plots from the PlotsCanvas class (also in PlotDisplay.py). The managing of the waveform data is managed within Waveform class.

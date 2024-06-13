@@ -39,7 +39,7 @@ class Notebook(ttk.Notebook):
     
     As well as the sizing of the canvases (if one wants to focus on a specifc channel)
     '''
-    def __init__(self, frame: ttk.Frame, figsize: tuple):
+    def __init__(self, frame: ttk.Frame, figsize: tuple, index: int = None):
         super().__init__(frame)
         self.frame = frame
         self.figsize = figsize

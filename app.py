@@ -43,7 +43,6 @@ def app(name):
                             relief = tk.RAISED,
                             borderwidth = 1,
                             name = "display")
-
     daq = DaqClass( root,
                     displayFrame,
                     pydaq_cfg.getint('numChannels',

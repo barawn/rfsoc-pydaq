@@ -155,6 +155,22 @@ class PlotCanvas(FigureCanvasTkAgg):
 
         self.draw()
 
+    def plotAGC(self):
+        self.figure.clear()
+        
+        ax = self.figure.add_subplot(111)
+        
+        ax.plot(self.waveform.timelist*10**9, self.waveform.waveform)
+
+        ax.set_title(self.title)
+        ax.set_xlabel('time (ns)')
+        ax.set_ylabel('ADC Counts', labelpad=-3.5)
+
+        self.waveform.setOffset()
+        
+        ax.axhline(y=self.waveform.offset, color='black', linewidth=0.4, label='Offset')
+        pass
+
     def plotFFT(self):
         self.figure.clear()
         

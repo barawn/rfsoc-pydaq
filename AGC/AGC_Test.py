@@ -27,4 +27,7 @@ class AGC_Test(AGC_Daq):
                  channelName = ["","","","","","","",""]):
         super().__init__(root, frame, numChannels, numSamples, channelName)
 
-    
+
+    ############################
+    ##Maybe write your code here?
+    ############################

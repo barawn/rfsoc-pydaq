@@ -61,7 +61,7 @@ class Waveframe(tk.Frame):
         
         super().__init__(self.parent)
         
-        self.notebook = notebookClass(self, self.parent.figsize)
+        self.notebook = notebookClass(self, self.parent.figsize, self.index)
 
         self.btns = {}
         

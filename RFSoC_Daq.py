@@ -110,6 +110,9 @@ class RFSoC_Daq:
     def getSaveName(self):
         logger.debug(f"The currently set save name is : {self.wf.saveText}")
         return self.wf.saveText
+    
+    def getAdc(self, ch = 0):
+        return self.adcBuffer[ch]/256 - 15.5
         
     ############################
     ##Calculations
@@ -136,7 +139,8 @@ class RFSoC_Daq:
         
         combined = np.column_stack((data1, data2))
 
-        np.savetxt(f'/home/xilinx/data/{filename}.csv', combined, delimiter=',')
+        np.savetxt(f'/Users/hpumphrey/Com/rfsoc-pydaq/{filename}.csv', combined, delimiter=',')
+        # np.savetxt(f'/home/xilinx/data/{filename}.csv', combined, delimiter=',')
 
     def Save(self):
         index = self.getEnlargedNotebook()
@@ -309,7 +313,7 @@ class RFSoC_Daq:
             logger.error("No RFSoC device is loaded!")
         self.dev.internal_capture(self.adcBuffer, self.numChannels)
         for ch in Ch:
-            self.wf.waveframes[ch].setWaveform(self.adcBuffer[ch])
+            self.wf.waveframes[ch].setWaveform(self.adcBuffer[ch] >> 4)
         logger.debug("Acquired data")
     
     def rfsocAcquire(self):
@@ -320,11 +324,12 @@ class RFSoC_Daq:
                                     self.numChannels)
         
         for i in range(self.numChannels):
-            self.wf.waveframes[i].setWaveform(self.adcBuffer[i])
+            self.wf.waveframes[i].setWaveform(self.adcBuffer[i] >> 4)
             if self.wf.waveframes[i].toPlot == True:
                 self.wf.waveframes[i].notebook.plot()
                 
         logger.debug("Acquired data and Plotted")
+
 
 if __name__ == '__main__':
     pass

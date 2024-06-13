@@ -36,9 +36,10 @@ class AGC_Daq(RFSoC_Daq):
         super().__init__(root, frame, numChannels, numSamples, channelName)
 
         self.sdv = None
-        self.rfsocLoad("zcuagc")
-        
-
+        try:
+            self.rfsocLoad("zcuagc")
+        except:
+            pass
     ############################
     ##Maybe write your code here?
     ############################
@@ -132,10 +133,7 @@ class AGC_Daq(RFSoC_Daq):
         logger.debug(f"The Scaling is currently set to {scaling}")
         return scaling
     
-    def getAdc(self, ch = 0):
-        return self.adcBuffer[ch]/256 - 15.5
-    
-    def getAccumulator(self):
+    def getAccum(self):
         return self.sdv.read(0x4)/131072
     
     def getTailDiff(self):
@@ -168,6 +166,7 @@ class AGC_Daq(RFSoC_Daq):
 
     ############################
     ##DAQ Methods
+    # I woudln't touch
     ############################
 
     def startWaveFrame(self):
@@ -250,36 +249,11 @@ class AGC_Daq(RFSoC_Daq):
         os.chdir(curdir)
 
         try:
-            from serialcobsdevice import SerialCOBSDevice
+            from serialcobsdevice import SerialCOBSDevice       ###Since this comes from the loaded zcuagc overlay it may not be recognised in vscode without the explicit import 
             self.setSDV(SerialCOBSDevice('/dev/ttyPS1', 1000000))
         except:
             logger.debug("It would appear the overloay you have tried to load doesn't contain SerialCOBSDevice")
         return
-    
-    def Acquire(self, Ch = 0):
-        if isinstance(Ch, int):
-            Ch = [Ch]
-        if self.dev is None:
-            logger.error("No RFSoC device is loaded!")
-        self.dev.internal_capture(self.adcBuffer, self.numChannels)
-        for ch in Ch:
-            self.wf.waveframes[ch].setWaveform(self.adcBuffer[ch] >> 4)     ####Removes last 4 bits. Probably could be in super class but can always be edited later
-        logger.debug("Acquired data")
-    
-    def rfsocAcquire(self):
-        if self.dev is None:
-            logger.error("No RFSoC device is loaded!")
-            
-        self.dev.internal_capture(self.adcBuffer,
-                                    self.numChannels)
-        
-        for i in range(self.numChannels):
-            self.wf.waveframes[i].setWaveform(self.adcBuffer[i] >> 4)
-            if self.wf.waveframes[i].toPlot == True:
-                self.wf.waveframes[i].notebook.plot()
-                
-        logger.debug("Acquired data and Plotted")
-
 
 if __name__ == '__main__':
     pass
