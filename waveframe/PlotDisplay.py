@@ -26,6 +26,8 @@ class PlotDisplay(ttk.Frame):
     This purely exists becuase one cannot directly populate notebooks with canvases. The canvases must be attached to a frame
     
     This automatically handles the packing of the canvas onto the notebook
+
+    Probably shouldn't be edited. It handles stuff pretty well
     '''
     def __init__(self,
                  notebook: ttk.Notebook,
@@ -81,9 +83,7 @@ class PlotCanvas(FigureCanvasTkAgg):
         self.waveform.setRMS()
         self.waveform.setOffset()
         
-        ax.axhline(y=self.waveform.offset, color='black', linewidth=0.4, label='Zero Line')
-        ax.axhline(y=self.waveform.RMS+self.waveform.offset, color='black', linestyle='--', linewidth=0.3, label='RMS Line')
-        ax.axhline(y=-self.waveform.RMS+self.waveform.offset, color='black', linestyle='--', linewidth=0.3, label='RMS Line')
+        ax.axhline(y=self.waveform.offset, color='black', linewidth=0.4, label='Offset')
         
         try:
             self.waveform.frequencyFFT
@@ -94,7 +94,64 @@ class PlotCanvas(FigureCanvasTkAgg):
         
         ax.text(0.97, 0.97, stats_text, verticalalignment='top', horizontalalignment='right',
             transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.5))
+
+        self.draw()
+
+    def plotPulseWave(self):
+        self.figure.clear()
         
+        ax = self.figure.add_subplot(111)
+        
+        ax.plot(self.waveform.timelist*10**9, self.waveform.waveform)
+        
+        ax.set_title(self.title)
+        ax.set_xlabel('time (ns)')
+        ax.set_ylabel('ADC Counts', labelpad=-3.5)
+        
+        self.waveform.setRMS()
+        self.waveform.setOffset()
+        
+        ax.axhline(y=0, color='black', linewidth=0.4, label='Zero Line')
+        
+        try:
+            self.waveform.frequencyFFT
+        except:
+            self.waveform.setWaveFFT()
+            
+        stats_text = f"Frequency : {self.waveform.frequencyFFT*10**(-6):.2f} MHz"
+        
+        ax.text(0.97, 0.97, stats_text, verticalalignment='top', horizontalalignment='right',
+            transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.5))
+
+        self.draw()
+
+    def plotSineWave(self):
+        self.figure.clear()
+        
+        ax = self.figure.add_subplot(111)
+        
+        ax.plot(self.waveform.timelist*10**9, self.waveform.waveform)
+        
+        ax.set_title(self.title)
+        ax.set_xlabel('time (ns)')
+        ax.set_ylabel('ADC Counts', labelpad=-3.5)
+        
+        self.waveform.setRMS()
+        self.waveform.setOffset()
+        
+        ax.axhline(y=self.waveform.offset, color='black', linewidth=0.4, label='Offset')
+        ax.axhline(y=self.waveform.RMS+self.waveform.offset, color='black', linestyle='--', linewidth=0.3, label='RMS Line')
+        ax.axhline(y=-self.waveform.RMS+self.waveform.offset, color='black', linestyle='--', linewidth=0.3, label='RMS Line')
+        
+        try:
+            self.waveform.frequencyFFT
+        except:
+            self.waveform.setWaveFFT()
+            
+        stats_text = f"Amplitude : {self.waveform.amplitudeFFT} ADC\nRMS : {self.waveform.RMS:.2f} ADC\nFrequency : {self.waveform.frequencyFFT*10**(-6):.2f} MHz\nOffset : {self.waveform.offset:.2f} ADC"
+        
+        ax.text(0.97, 0.97, stats_text, verticalalignment='top', horizontalalignment='right',
+            transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.5))
 
         self.draw()
 

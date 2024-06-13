@@ -61,7 +61,6 @@ class RFSoC_Daq:
         self.startWaveFrame()
         self.setHotKeys()
 
-
     def startWaveFrame(self):
         for i in range(self.numChannels):
             self.wf.addWaveframe(Waveframe(self.wf, i, self.channelName[i].split()[0]))
@@ -108,7 +107,10 @@ class RFSoC_Daq:
             logger.debug("Appears the waveform hasn't ben instantiated")
             return 0
         
-    
+    def getSaveName(self):
+        logger.debug(f"The currently set save name is : {self.wf.saveText}")
+        return self.wf.saveText
+        
     ############################
     ##Calculations
     ############################
@@ -121,15 +123,20 @@ class RFSoC_Daq:
     ############################
     ##Saving Methods
     ############################
-    def writeToCSV(self, fileName, data):
-        data = np.array(data)
-        np.savetxt('/home/xilinx/data/testing.csv', data, delimiter=',')
+    def writeToCSV(self, filename, data):
+        if not isinstance(data, np.ndarray):
+            data = np.array(data)
+        np.savetxt(f'/home/xilinx/data/{filename}.csv', data, delimiter=',')
     
-    def writeCSV(self, fileName, columns, data):
-        with open(fileName, mode='w', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(columns)
-            writer.writerows(data)
+    def writeCSV(self, filename, data1, data2):
+        if not isinstance(data1, np.ndarray):
+            data1 = np.array(data1)
+        if not isinstance(data2, np.ndarray):
+            data2 = np.array(data2)
+        
+        combined = np.column_stack((data1, data2))
+
+        np.savetxt(f'/home/xilinx/data/{filename}.csv', combined, delimiter=',')
 
     def Save(self):
         index = self.getEnlargedNotebook()
@@ -216,6 +223,7 @@ class RFSoC_Daq:
         
         self.root.bind("<Next>", lambda event: self.switchTab())
         self.root.bind("<Prior>", lambda event: self.switchTabBack())
+
 
     ############################
     ##DAQ Methods
@@ -317,9 +325,6 @@ class RFSoC_Daq:
                 self.wf.waveframes[i].notebook.plot()
                 
         logger.debug("Acquired data and Plotted")
-
-
-
 
 if __name__ == '__main__':
     pass

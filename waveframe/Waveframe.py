@@ -48,7 +48,8 @@ class Waveframe(tk.Frame):
     def __init__(self,
                  parent: tk.Frame,
                  index: int,
-                 title):
+                 title: str,
+                 notebookClass: Notebook = Notebook):
         
         self.parent = parent
         self.sampleRate = 3.E9
@@ -60,7 +61,7 @@ class Waveframe(tk.Frame):
         
         super().__init__(self.parent)
         
-        self.notebook = Notebook(self, self.parent.figsize)
+        self.notebook = notebookClass(self, self.parent.figsize)
 
         self.btns = {}
         

@@ -2,6 +2,19 @@ import tkinter as tk
 from typing import Callable
 
 class submitButton:
+    """
+    So this is a template for a submit button GUI widget
+
+    Label, Entry Field, Submit Button (tied to enter/return key)
+
+    Input:
+    Parent frame, most likely the submit frame
+    label_text, what the submit value will do
+    placeholder_text, should be the current/default value for the option we are changing
+    submit_command, this should be a submit<Something>Value in the appropriate Daq Class, basically what actually does the work in changing stuff
+    index, Only here for the grid system
+    Auto, Should be an array of 2 elements which are bounds to limit the users input. Enitrely optional. Mainly put in to ensure the sample number can't be set to crash the whole thing
+    """
     def __init__(self,
                  parent: tk.Frame,
                  label_text,

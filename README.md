@@ -47,72 +47,42 @@ embedded into a Python module yet.
 
 * A tabbed plotting canvas (in progress)
 
-## Stuff I added
+## New, most usable version yet!!!
 
-![Screenshot of RFSoC-PyDaq Running](https://github.com/pueo-pynq/rfsoc-pydaq/blob/Hugo/pydaqimage.png)
+One should run with root. Can use sudo -i to get to root.
 
-### Features:
-StartUp:
-* One can run rfsoc-pydaq from anywhere start location (obviously with the appropriate path)
-* It will automatically load the zcu bitstream upon startup
-* The Frame sizing should be automatic but this has only been tested on a limited displays
+Running app.py, will launch the TKinter GUI with the RFSoC_Daq class embedded.
 
-MainButtons:
-* I do not know if load works if something is automatically loaded
-* The Acquire hotkey (F5) or button will run an internal capture
-* User doesn't do anythinf
-* I couldn't get restart to work, so it doesn't do anything
-* Save will save 100 waveforms of the 1st packed Waveframe display. It will plot 1.
+This is the super Daq class that contains all the useful basics for all firmware overlays loaded into the daq.dev
 
-ExtraButtons:
-* Freq/Fit toggle buttons toggle whether after an internal capture the Frequnecy spectrum FFT and Sine Curve Fit is plotted. This (especially the fit) make running the acquire method take much longer. (Plotting in TKinter is the most time consuming process)
+The Daq class will store the Waveframes class that holds multiple Waveframe classes. These waveframe classes store the core GUI of the DAQ. The waveframe most importantly contains a tk.Notebook class called Notebook which will automatically manage, pack and dipslay plots that it gets from the PlotDipslay class that holds plots from the PlotsCanvas class (also in PlotDisplay.py). The managing of the waveform data is managed within Waveform class.
 
-* Set SampleSize allows you to change the sample size as 2^(2 to 14). 
-* Set Filename allows you to change the name of the file to be saved. This should be global to the GUI. The pathing may be different depending on the save method. To save say 200_100 you'd have to type "200_100". The scrolled log should output the change
+### You the User!
 
-### Waveform:
-This was just an easier way of being able to do anything with the ADC buffer data from an internal capture. Each Internal capture will create a Waveform instance. 
+Ideally the only parts of the main program you should be editing is PlotCanvas, to add new plot method, and Waveform (though I am tempted to have this be a superclass that particular firmware/testing type directories have a derived class within), to add new data analyse techniques (this is were the FFT and etc are done)
 
-This is full of mainly pointless methods. Since most of this should be done in subsequent analysis I've done the terrible practice of initialising instance variables within methods, since an individual waveform instance is unlikley to be running multiple methods and doesn't need all the bloat of unnessasary instance variables.
+To use RFSoC-PyDAQ for you're own purposes:
+* Choose/make a directory for you intended purpose (say AGC)
+* Make a derived class of RFSoC_Daq (called name_Daq) to house core methods (such as runAGC unique to testing AGC firmware)
+* Maybe make another derived class of e.g. AGC_Daq called name_Test. This can store new unproven methods and leave a nice clean python file to edit on emacs locally on the FPGA if say you don't have you FPGA connected to the labnetwork/internet. 
+* If you feel the plots are not adequete for your task add a derived Notebook class that can add more plots to your Daq GUI. (New plots will need to be added as a method to PlotCanvas). You would only need to override the plot method in the derived Notebook. The rest is just general canvas managment stuff
 
-This is where all of handling of the ADC buffer data should be handled
+One can also override methods from RFSoC_Daq such as: 
+* Having the load method automatically load the appropriate overlay
+* StartWaveFrames method have the modules own notebook loaded
+* Have acquire automatically format ADC buffer data
+* More idk
 
-### Waveframes:
-This is a colllection of individual Waveframe. It's main job is just to handle the packing of a Waveframe and store variables that should be the same for each WaveFrame such as the same name
+Oh yeah and you will have to edit the config file and add to the method getDaq in app.py if you are adding two much stuff
 
+### What this assumes
 
-#### Waveframe
-This is where the recorded data is displayed. Each Waveframe is made up of a Notebook and a button frame.
-
-#### Notebook
-Notebook allows on to have multiple tabs on a display GUI. The plots are controlled by PlotDisplay and PlotCanvas
-
-#### PlotDisplay
-This is only necessary to add a canvas to the Notebook. The canvas needs to be within a frame and the frame needs to be added in a particular way. This should automatically do this
-
-#### PlotCanvas
-Populate with methods to plot whatever you want. Each individual method is for a single plot
-
-### Waveframe button frame
-* SaveWF will save the adc buffer data for that specific waveform sample from the selected ADC channel. The name is detemined by the set filename submit widget
-* SavePlt will save the currently open canvas open in the notebook. So either the waveform, FFT, fit etc. To make the image better it will launch the enlarge button. This process takes way longer than one might think. Saving is clearly finised when the Waveframes are repacked as normal. This should save to a Figures directory in data directory.
-* Enlarge just allows one to focus on a single channel. The other channel Waveframe instances will be unpakced and won't plot and the chosen channels display will fill the screen. If you are only using one channel this is significantly quicker.
-* Plot? toggle whether you want a channels display to plot. Again plotting takes the longest time.
+* That you save data in /home/xilinx/data
+* That your loading overlay
 
 
-## Notes for the user
+### Current issues
 
-Most things can be accessed through the GUI. However the user currently has to change within the code:
-* The number of saved waveforms (should be 100 atm)
-* The saved directory of the saved waveforms
+* Since moving everything around a tonne the scrolled log no longer works. Log inputs still put in terminal but needs to be fixed.
 
-## Adding to existing
-To add a new frame to notebooks
-* Within the Notebook constructor add
-self.what-frame-will-do_frame = PlotDisplay(self, figsize, "Name of tab in notebook", self.waveform)
-* Ensure the waveform is set in method setWaveform
-self.what-frame-will-do_frame.updateWaveform(self.waveform)
-* Write a plot method within PlotCanvas
-* Make sure that the Notebooks plot method is ammended to ensure that it is plotted
-
-
+* Since I wrote this on my laptop and the OSU ZCU-111 doesn't have internet some troubleshooting to actually make this work on an FPGA might have slipped through when testing on the OSU zcu-111 and not be added to the git repo from my laptop. Also some methods or implementation won't be in the repo. Also certain save methods that previous worked have not been retested. Will have to wait to test on fully connected to lab-network and internet UCL zcu-111 to properly test the migration of all features. What I'm trying to say is the thing works but some auxillary functionality isn't fully tested yet

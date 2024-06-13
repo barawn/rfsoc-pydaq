@@ -17,8 +17,8 @@ from textconsole.TextConsole import TextConsole
 from scrolledlog.ScrolledLog import ScrolledLog
 
 from RFSoC_Daq import RFSoC_Daq
-from AGC_Daq import AGC_Daq
-from AGC_Test import AGC_Test
+from AGC.AGC_Daq import AGC_Daq
+from AGC.AGC_Test import AGC_Test
 from widgets.SubmitButton import submitButton
 
 default_numChannels = 4

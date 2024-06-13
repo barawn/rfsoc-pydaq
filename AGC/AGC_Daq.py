@@ -15,10 +15,18 @@ from RFSoC_Daq import RFSoC_Daq
 
 from widgets.SubmitButton import submitButton
 
+from AGC.AgcNotebook import AgcNotebook
+from waveframe.Waveframe import Waveframe
+
 logger = logging.getLogger(__name__)
 
 #FPGA Class
 class AGC_Daq(RFSoC_Daq):
+    """
+    This is the base class for using the agc overlay.
+
+    Should only be ammended with core agc methods/protocols
+    """
     def __init__(self,
                  root: tk.Tk,
                  frame: tk.Frame,
@@ -27,9 +35,9 @@ class AGC_Daq(RFSoC_Daq):
                  channelName = ["","","","","","","",""]):
         super().__init__(root, frame, numChannels, numSamples, channelName)
 
-        
         self.sdv = None
-
+        self.rfsocLoad("zcuagc")
+        
 
     ############################
     ##Maybe write your code here?
@@ -50,7 +58,7 @@ class AGC_Daq(RFSoC_Daq):
 
     def applyAGC(self):
         if self.sdv is not None:
-            self.sdv.write(0x00, 0x300)
+            self.sdv.write(0x00, 0x400)
             logger.debug("AGC applied")
         else:
             logger.debug("AGC not applied, no sdv set")
@@ -128,7 +136,7 @@ class AGC_Daq(RFSoC_Daq):
         return self.adcBuffer[ch]/256 - 15.5
     
     def getAccumulator(self):
-        return self.sdv.read(0x4)
+        return self.sdv.read(0x4)/131072
     
     def getTailDiff(self):
         gt = self.sdv.read(0x8)
@@ -162,6 +170,13 @@ class AGC_Daq(RFSoC_Daq):
     ##DAQ Methods
     ############################
 
+    def startWaveFrame(self):
+        for i in range(self.numChannels):
+            self.wf.addWaveframe(Waveframe(self.wf, i, self.channelName[i].split()[0], AgcNotebook))
+            logger.debug(f"Waveframe {i} has been made")
+        self.wf.packFrames()
+        self.wf.pack()
+
     def rfsocLoad(self, hardware = None):
         """Load an overlay file describing an RFSoC instance.
         The overlay needs to support being created bare (just "overlayName()")
@@ -169,9 +184,9 @@ class AGC_Daq(RFSoC_Daq):
         function.
         """            
 
-        try:
+        if hardware is not None:
             file_path = f'/home/xilinx/python/{hardware}.py'
-        except:
+        else:
             file_path = filedialog.askopenfilename(title="Select an overlay module",
                                             filetypes=[("Python files","*.py"),
                                                         ("All files", "*.*")])
@@ -240,3 +255,31 @@ class AGC_Daq(RFSoC_Daq):
         except:
             logger.debug("It would appear the overloay you have tried to load doesn't contain SerialCOBSDevice")
         return
+    
+    def Acquire(self, Ch = 0):
+        if isinstance(Ch, int):
+            Ch = [Ch]
+        if self.dev is None:
+            logger.error("No RFSoC device is loaded!")
+        self.dev.internal_capture(self.adcBuffer, self.numChannels)
+        for ch in Ch:
+            self.wf.waveframes[ch].setWaveform(self.adcBuffer[ch] >> 4)     ####Removes last 4 bits. Probably could be in super class but can always be edited later
+        logger.debug("Acquired data")
+    
+    def rfsocAcquire(self):
+        if self.dev is None:
+            logger.error("No RFSoC device is loaded!")
+            
+        self.dev.internal_capture(self.adcBuffer,
+                                    self.numChannels)
+        
+        for i in range(self.numChannels):
+            self.wf.waveframes[i].setWaveform(self.adcBuffer[i] >> 4)
+            if self.wf.waveframes[i].toPlot == True:
+                self.wf.waveframes[i].notebook.plot()
+                
+        logger.debug("Acquired data and Plotted")
+
+
+if __name__ == '__main__':
+    pass

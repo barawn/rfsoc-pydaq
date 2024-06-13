@@ -11,14 +11,17 @@ import logging
 import subprocess
 import os, sys, inspect, importlib, configparser, csv
 
-from AGC_Daq import AGC_Daq
+from RFSoC_Daq import RFSoC_Daq
 
 from widgets.SubmitButton import submitButton
+
+from Pulse.PulseNotebook import PulseNotebook
+from waveframe.Waveframe import Waveframe
 
 logger = logging.getLogger(__name__)
 
 #FPGA Class
-class AGC_Test(AGC_Daq):
+class Pulse_Daq(RFSoC_Daq):
     def __init__(self,
                  root: tk.Tk,
                  frame: tk.Frame,
@@ -26,5 +29,3 @@ class AGC_Test(AGC_Daq):
                  numSamples: int = 2**11,
                  channelName = ["","","","","","","",""]):
         super().__init__(root, frame, numChannels, numSamples, channelName)
-
-    
