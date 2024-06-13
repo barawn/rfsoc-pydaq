@@ -148,7 +148,8 @@ def app(name):
 ############################
 def getConfig(name = "rfsoc"):
     config = configparser.ConfigParser()
-    config.read('/Users/hpumphrey/Com/rfsoc-pydaq/rfsoc-pydaq.ini')
+    config.read('/home/xilinx/rfsoc-pydaq/rfsoc-pydaq.ini')
+    # config.read('/Users/hpumphrey/Com/rfsoc-pydaq/rfsoc-pydaq.ini') #This was used for testing on my local machine
 
     if name not in config:
         print("Bad config file")

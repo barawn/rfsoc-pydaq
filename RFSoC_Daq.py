@@ -126,21 +126,19 @@ class RFSoC_Daq:
     ############################
     ##Saving Methods
     ############################
-    def writeToCSV(self, filename, data):
+    def writeToCSV(self, data, filename = None):
         if not isinstance(data, np.ndarray):
             data = np.array(data)
-        np.savetxt(f'/home/xilinx/data/{filename}.csv', data, delimiter=',')
+        np.savetxt(f'/home/xilinx/data/{filename if filename is not None else self.wf.saveText}.csv', data, delimiter=',')
     
-    def writeCSV(self, filename, data1, data2):
+    def writeCSV(self, data1, data2, filename = None):        
         if not isinstance(data1, np.ndarray):
             data1 = np.array(data1)
         if not isinstance(data2, np.ndarray):
             data2 = np.array(data2)
         
         combined = np.column_stack((data1, data2))
-
-        np.savetxt(f'/Users/hpumphrey/Com/rfsoc-pydaq/{filename}.csv', combined, delimiter=',')
-        # np.savetxt(f'/home/xilinx/data/{filename}.csv', combined, delimiter=',')
+        np.savetxt(f'/home/xilinx/data/{filename if filename is not None else self.wf.saveText}.csv', combined, delimiter=',')
 
     def Save(self):
         index = self.getEnlargedNotebook()
