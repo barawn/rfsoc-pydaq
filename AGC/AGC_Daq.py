@@ -36,10 +36,7 @@ class AGC_Daq(RFSoC_Daq):
         super().__init__(root, frame, numChannels, numSamples, channelName)
 
         self.sdv = None
-        try:
-            self.rfsocLoad("zcuagc")
-        except:
-            pass
+        self.rfsocLoad("zcuagc")
     ############################
     ##Maybe write your code here?
     ############################

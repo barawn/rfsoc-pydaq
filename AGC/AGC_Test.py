@@ -30,6 +30,7 @@ class AGC_Test(AGC_Daq):
         super().__init__(root, frame, numChannels, numSamples, channelName)
 
         self.pid_loop=False
+        self.task_thread = None
 
     ############################
     ##Maybe write your code here?
@@ -39,13 +40,13 @@ class AGC_Test(AGC_Daq):
     ##PID Loops
     ############################
     def run_pid_loop(self, input: bool):
-        logger.debug("Run Pid Loop has been started")
         self.pid_loop = input
         if input is True:
             self.task_thread = threading.Thread(target=self.pid_loop)
             self.task_thread.start()
 
     def pid_loop(self):
+        logger.debug("PID!!!")
         self.setOffset(0)
         self.setScaling(4096)
         self.runAGC()
@@ -62,7 +63,6 @@ class AGC_Test(AGC_Daq):
         arrconvalScale.append(convalScale)
 
         while self.pid_loop is True:
-            logger.debug("PID LOOP Running")
             self.setScaling(int(convalScale*(2**scaleFracBits))) 
             self.runAGC()
 
