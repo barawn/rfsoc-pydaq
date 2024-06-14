@@ -63,7 +63,7 @@ class RFSoC_Daq:
 
     def startWaveFrame(self):
         for i in range(self.numChannels):
-            self.wf.addWaveframe(Waveframe(self.wf, i, self.channelName[i].split()[0]))
+            self.wf.addWaveframe(Waveframe(self.wf, i, self.channelName[i]))
             logger.debug(f"Waveframe {i} has been made")
         self.wf.packFrames()
         self.wf.pack()

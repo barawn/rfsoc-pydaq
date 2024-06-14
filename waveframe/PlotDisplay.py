@@ -169,7 +169,7 @@ class PlotCanvas(FigureCanvasTkAgg):
         self.waveform.setOffset()
         
         ax.axhline(y=self.waveform.offset, color='black', linewidth=0.4, label='Offset')
-        pass
+        self.draw()
 
     def plotFFT(self):
         self.figure.clear()

@@ -15,6 +15,7 @@ import threading
 from AGC.AGC_Daq import AGC_Daq
 
 from widgets.SubmitButton import submitButton
+from widgets.TaskManager import TaskManager
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +39,11 @@ class AGC_Test(AGC_Daq):
     ##PID Loops
     ############################
     def run_pid_loop(self, input: bool):
+        logger.debug("Run Pid Loop has been started")
         self.pid_loop = input
         if input is True:
             self.task_thread = threading.Thread(target=self.pid_loop)
+            self.task_thread.start()
 
     def pid_loop(self):
         self.setOffset(0)
@@ -59,6 +62,7 @@ class AGC_Test(AGC_Daq):
         arrconvalScale.append(convalScale)
 
         while self.pid_loop is True:
+            logger.debug("PID LOOP Running")
             self.setScaling(int(convalScale*(2**scaleFracBits))) 
             self.runAGC()
 
@@ -228,8 +232,6 @@ class AGC_Test(AGC_Daq):
         super().setDisplay()
         button = self.root.nametowidget("button")
         buttons = {}
-        buttons['Save'] = tk.Button(button,
-                                text = "Save",
-                                command = self.run_pid_loop)
-        buttons['Save'].grid(row=0, column=10)
+        buttons['PID'] = TaskManager(button, "PID_Loop", self.run_pid_loop)
+        buttons['PID'].grid(row=0, column=10)
 

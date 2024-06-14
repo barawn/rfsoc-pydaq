@@ -184,7 +184,7 @@ class AGC_Daq(RFSoC_Daq):
         """            
 
         if hardware is not None:
-            file_path = f'/home/xilinx/python/{hardware}.py'
+            file_path = f'/home/xilinx/zcumts/{hardware}.py'
         else:
             file_path = filedialog.askopenfilename(title="Select an overlay module",
                                             filetypes=[("Python files","*.py"),
