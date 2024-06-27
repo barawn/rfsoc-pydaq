@@ -39,42 +39,47 @@ class AGC_Test(AGC_Daq):
     ############################
     ##PID Loops
     ############################
-    def run_pid_loop(self, input: bool):
-        self.pid_loop = input
-        if input is True:
-            self.task_thread = threading.Thread(target=self.pid_loop)
-            self.task_thread.start()
 
-    def pid_loop(self):
+    def run_pid_loop(self, should_run: bool):
+        self._pid_loop_running = should_run
+        if should_run:
+            self.task_thread = threading.Thread(target=self._pid_loop_method)
+            self.task_thread.start()
+        else:
+            self._pid_loop_running = False
+
+    def _pid_loop_method(self):
         logger.debug("PID!!!")
         self.setOffset(0)
         self.setScaling(4096)
         self.runAGC()
 
         kp_val = 0
-        ki_val = - 1 / 256 # from the scales.py
+        ki_val = -1 / 256  # from the scales.py
 
-        err_vals = [] # empty array for the error values
-        err =np.sqrt( self.getAccum()) - 4  # sqrt accumulator we want an RMS of 4  
+        err_vals = []  # empty array for the error values
+        err = np.sqrt(self.getAccum()) - 4  # sqrt accumulator we want an RMS of 4  
         err_vals.append(0)
         scaleFracBits = 12
-        convalScale = 1 # control value for the scaling 
+        convalScale = 1  # control value for the scaling 
         arrconvalScale = []
         arrconvalScale.append(convalScale)
 
-        while self.pid_loop is True:
-            self.setScaling(int(convalScale*(2**scaleFracBits))) 
+        iter = 0
+        while self._pid_loop_running:  # Use the new attribute to control the loop
+            self.setScaling(int(convalScale * (2**scaleFracBits))) 
             self.runAGC()
 
             sqrtFracBits = 9
-            rawVal = np.round(np.sqrt(self.getAccum())*(2**sqrtFracBits))/(2**sqrtFracBits)
+            rawVal = np.round(np.sqrt(self.getAccum()) * (2**sqrtFracBits)) / (2**sqrtFracBits)
             err = rawVal - 4
-        
-            convalScale +=  kp_val * ( err - err_vals[iter - 1]) + ki_val * err
-            convalScale = np.round(convalScale*(2**scaleFracBits))/(2**scaleFracBits)
+            
+            convalScale += kp_val * (err - err_vals[iter - 1]) + ki_val * err
+            convalScale = np.round(convalScale * (2**scaleFracBits)) / (2**scaleFracBits)
 
             err_vals.append(err)
             arrconvalScale.append(convalScale)
+            iter += 1
 
     def smoothing(self):# i am not quick this will take me a hot minute 
 

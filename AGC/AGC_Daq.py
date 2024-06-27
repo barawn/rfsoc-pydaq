@@ -174,77 +174,7 @@ class AGC_Daq(RFSoC_Daq):
         self.wf.pack()
 
     def rfsocLoad(self, hardware = None):
-        """Load an overlay file describing an RFSoC instance.
-        The overlay needs to support being created bare (just "overlayName()")
-        and must support the "internal_capture( buffer, numChannels )"
-        function.
-        """            
-
-        if hardware is not None:
-            file_path = f'/home/xilinx/zcumts/{hardware}.py'
-        else:
-            file_path = filedialog.askopenfilename(title="Select an overlay module",
-                                            filetypes=[("Python files","*.py"),
-                                                        ("All files", "*.*")])
-        
-        logger.debug("Asked to load overlay at %s" % file_path)
-        newdir = os.path.dirname(os.path.abspath(file_path))    
-
-        curpath = sys.path
-        logger.debug("Adding directory %s to module search path" % newdir)
-        sys.path.insert(1, newdir)    
-        curdir = os.path.abspath(os.curdir)
-        logger.debug("Changing directory to %s" % newdir)
-        os.chdir(newdir)
-        base, extension = os.path.splitext(os.path.basename(file_path))
-        logger.debug("Going to try to import %s", base)
-            
-        # create a custom exception
-        class LocalException(Exception):
-            pass
-        
-        try:
-            module = importlib.import_module(base, package=None)
-            # First try to find an Overlay or module.FakeOverlay module.
-            # FakeOverlays need to be defined in the same file.
-            overlayClass = None
-            for name, obj in inspect.getmembers(module):
-                if inspect.isclass(obj):
-                    if obj.__name__ == 'Overlay' and obj.__module__ == 'pynq.overlay':
-                        overlayClass = obj
-                    if obj.__name__ == 'FakeOverlay' and obj.__module__ == module.__name__:
-                        overlayClass = obj
-            if overlayClass is None:
-                del sys.modules[module.__name__]
-                raise LocalException("Unable to find Overlay class in module %s" % module.__name__)
-            logger.debug("Found Overlay class %s from module %s" % (overlayClass.__name__ , overlayClass.__module__ ))
-            # Now find the module to call
-            theClass = None
-            for name, obj in inspect.getmembers(module):
-                if inspect.isclass(obj):
-                    if issubclass(obj, overlayClass) and obj != overlayClass:
-                        theClass = obj
-            if theClass is None:
-                del sys.modules[module.__name__]            
-                raise LocalException("Unable to find a subclassed Overlay in module %s" % module.__name__)
-            captureFn = getattr(theClass, "internal_capture", None)
-            if not callable(captureFn):
-                del sys.modules[module.__name__]
-                raise LocalException("The Overlay %s in module %s has no callable internal_capture method" % (theClass.__name__ , module.__name__ ))
-            logger.debug("Found RFSoC overlay %s" % theClass.__name__)
-            self.dev = theClass()
-            logger.debug("Created RFSoC device")
-        except LocalException as e:
-            logger.error(str(e))
-        except Exception as e:
-            logger.error("Unable to load module %s" % base)
-            logger.error(str(e))
-            
-        logger.debug("Restoring original module search path")
-        sys.path = curpath
-        logger.debug("Going back to original directory %s" % curdir)
-        os.chdir(curdir)
-
+        super().rfsocLoad(hardware)
         try:
             from serialcobsdevice import SerialCOBSDevice       ###Since this comes from the loaded zcuagc overlay it may not be recognised in vscode without the explicit import 
             self.setSDV(SerialCOBSDevice('/dev/ttyPS1', 1000000))
