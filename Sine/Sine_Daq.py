@@ -29,3 +29,15 @@ class Sine_Daq(RFSoC_Daq):
                  numSamples: int = 2**11,
                  channelName = ["","","","","","","",""]):
         super().__init__(root, frame, numChannels, numSamples, channelName)
+
+        self.rfsocLoad("zcumts")
+
+
+    
+
+    def startWaveFrame(self):
+        for i in range(self.numChannels):
+            self.wf.addWaveframe(Waveframe(self.wf, i, self.channelName[i], SineNotebook))
+            logger.debug(f"Waveframe {i} has been made")
+        self.wf.packFrames()
+        self.wf.pack()

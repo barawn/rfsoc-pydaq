@@ -66,7 +66,7 @@ class Notebook(ttk.Notebook):
             self.time_frame.display.plotWaveForm()
             
             ##Plotting additional optional plots. These more than double the aqcuire time so making them optional is nice
-            if self.frame.parent.plotExtras["fft"]:
+            if self.frame.parent.plotExtras["fft"] is True:
                 self.fft_frame.display.plotFFT()
 
     ##Notebook tab stuff

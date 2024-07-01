@@ -17,8 +17,13 @@ from textconsole.TextConsole import TextConsole
 from scrolledlog.ScrolledLog import ScrolledLog
 
 from RFSoC_Daq import RFSoC_Daq
+
 from AGC.AGC_Daq import AGC_Daq
 from AGC.AGC_Test import AGC_Test
+from Biquad.Biquad_Daq import Biquad_Daq
+from Biquad.Biquad_Test import Biquad_Test
+from Pulse.Pulse_Daq import Pulse_Daq
+from Sine.Sine_Daq import Sine_Daq
 from widgets.SubmitButton import submitButton
 
 default_numChannels = 4
@@ -164,10 +169,17 @@ def getDaq(name = "rfsoc"):
         return AGC_Daq
     if name == "agc_test":
         return AGC_Test
+    if name == "biquad":
+        return Biquad_Daq
+    if name == "biquad_test":
+        return Biquad_Test
+    if name == "pulse":
+        return Pulse_Daq
+    if name == "sine":
+        return Sine_Daq
     else:
         return RFSoC_Daq
     
-
 ############################
 ##For submit buttons to work
 ############################

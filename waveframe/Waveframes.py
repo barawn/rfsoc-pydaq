@@ -53,7 +53,7 @@ class Waveframes(tk.Frame):
         screen_width = main_display.width
         screen_height = main_display.height
 
-        self.plotExtras = {"fft":True}
+        self.plotExtras = {"fft":False}
 
         self.figsize=(screen_width/(100*self.numChannels), screen_height/250)
 

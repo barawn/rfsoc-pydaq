@@ -22,11 +22,6 @@ logger = logging.getLogger(__name__)
 
 #FPGA Class
 class Biquad_Daq(RFSoC_Daq):
-    """
-    This is the base class for using the agc overlay.
-
-    Should only be ammended with core agc methods/protocols
-    """
     def __init__(self,
                  root: tk.Tk,
                  frame: tk.Frame,
@@ -36,18 +31,65 @@ class Biquad_Daq(RFSoC_Daq):
         super().__init__(root, frame, numChannels, numSamples, channelName)
 
         self.sdv = None
-        self.rfsocLoad("zcubq8")
+        self.rfsocLoad("zcubiquad")
+
+        self.setZero(0, 1)
+        self.update()
+    
     ############################
     ##Maybe write your code here?
     ############################
 
-
-
+    
     ############################
     ##Sets
     ############################
     def setSDV(self, sdv):
-        self.sdv = sdv        
+        self.sdv = sdv
+
+    def setZero(self, A:int, B:int):
+        A = A * 16384
+        B = B * 16384
+        self.sdv.write(0x04,B)
+        self.sdv.write(0x04,A)
+
+    def setPole(self, C0:int, C1:int, C2:int, C3:int):
+        self.sdv.write(0x08,C2)
+        self.sdv.write(0x08,C3)
+        self.sdv.write(0x08,C1)
+        self.sdv.write(0x08,C0)
+
+    def setIncComp(self, a1:int,a2:int):
+        self.sdv.write(0x0C,a1)
+        self.sdv.write(0x0C,a2)
+
+    def setFFFIR(self, Dff:int, X1:int, X2:int, X3:int, X4:int, X5:int, X6:int):
+        self.sdv.write(0x10,Dff)
+        self.sdv.write(0x10,X1)
+        self.sdv.write(0x10,X2)
+        self.sdv.write(0x10,X3)
+        self.sdv.write(0x10,X4)
+        self.sdv.write(0x10,X5)
+        self.sdv.write(0x10,X6)
+
+    def setGGFIR(self,Egg:int, X1:int, X2:int, X3:int, X4:int, X5:int, X6:int, X7:int):
+        self.sdv.write(0x14,Egg)
+        self.sdv.write(0x14,X1)
+        self.sdv.write(0x14,X2)
+        self.sdv.write(0x14,X3)
+        self.sdv.write(0x14,X4)
+        self.sdv.write(0x14,X5)
+        self.sdv.write(0x14,X6)
+        self.sdv.write(0x14,X7)
+
+    def setGFFIR(self, Dfg:int):
+        self.sdv.write(0x18,Dfg)
+    
+    def setFGFIR(self, Egf:int):
+        self.sdv.write(0x18,Egf)
+
+    def update(self):
+        self.sdv.write(0x00,1)
 
     ############################
     ##Gets

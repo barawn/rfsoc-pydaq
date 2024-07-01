@@ -82,7 +82,7 @@ class RFSoC_Daq:
     def setPlotFreq(self, Value=True):
         if isinstance(Value, bool):
             self.plotFreq = Value
-            self.wf.plotExtras[0] = Value
+            self.wf.plotExtras["fft"] = Value
             logger.debug(f"{'Plotting' if Value else 'Not plotting'} the frequency")
             return f"{'Plotting' if Value else 'Not plotting'} the frequency"
         else:
@@ -239,9 +239,9 @@ class RFSoC_Daq:
         function.
         """            
 
-        try:
+        if hardware is not None:
             file_path = f'/home/xilinx/python/{hardware}.py'
-        except:
+        else:
             file_path = filedialog.askopenfilename(title="Select an overlay module",
                                             filetypes=[("Python files","*.py"),
                                                         ("All files", "*.*")])

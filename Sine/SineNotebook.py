@@ -23,5 +23,14 @@ except:
     pass
 
 class SineNotebook(Notebook):
-    def __init__(self, frame: ttk.Frame, figsize: tuple):
+    def __init__(self, frame: ttk.Frame, figsize: tuple, index: int = None):
         super().__init__(frame, figsize)
+
+    def plot(self):        
+        if self.frame.toPlot == True:
+        
+            self.time_frame.display.plotSineWave()
+            
+            ##Plotting additional optional plots. These more than double the aqcuire time so making them optional is nice
+            if self.frame.parent.plotExtras["fft"] is True:
+                self.fft_frame.display.plotFFT()
