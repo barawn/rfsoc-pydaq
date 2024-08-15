@@ -171,6 +171,70 @@ class PlotCanvas(FigureCanvasTkAgg):
         ax.axhline(y=self.waveform.offset, color='black', linewidth=0.4, label='Offset')
         self.draw()
 
+    def plotBiquad(self):
+        self.figure.clear()
+        
+        ax = self.figure.add_subplot(111)
+
+        ax.plot(self.waveform.timelist[280:792]*10**9, self.waveform.waveform[280:792])
+
+        ax.set_title(self.title)
+        ax.set_xlabel('time (ns)')
+        ax.set_ylabel('ADC Counts', labelpad=-3.5)
+
+        self.waveform.setOffset()
+        self.waveform.setRMS()
+        self.waveform.setPeaktoPeak()
+
+        try:
+            self.waveform.frequencyFFT
+        except:
+            self.waveform.setWaveFFT()
+        
+        ax.axhline(y=self.waveform.offset, color='black', linewidth=0.4, label='Offset')
+        ax.axhline(y=self.waveform.RMS+self.waveform.offset, color='black', linestyle='--', linewidth=0.3, label='RMS Line')
+        ax.axhline(y=-self.waveform.RMS+self.waveform.offset, color='black', linestyle='--', linewidth=0.3, label='RMS Line')
+
+        stats_text = f"RMS : {self.waveform.RMS:.2f} ADC\nFrequency : {self.waveform.frequencyFFT*10**(-6):.2f} MHz"
+        
+        ax.text(0.97, 0.97, stats_text, verticalalignment='top', horizontalalignment='right',
+            transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.5))
+
+        self.draw()
+
+    def plotBiquad2(self):
+        self.figure.clear()
+        
+        ax = self.figure.add_subplot(111)
+        
+        # ax.plot(self.waveform.timelist[401:913]*10**9, self.waveform.waveform[401:913])
+        ax.plot(self.waveform.timelist[390:920]*10**9, self.waveform.waveform[390:920])
+        # ax.plot(self.waveform.timelist*10**9, self.waveform.waveform)
+
+        ax.set_title(self.title)
+        ax.set_xlabel('time (ns)')
+        ax.set_ylabel('ADC Counts', labelpad=-3.5)
+
+        self.waveform.setOffset()
+        self.waveform.setRMS()
+        self.waveform.setPeaktoPeak()
+
+        try:
+            self.waveform.frequencyFFT
+        except:
+            self.waveform.setWaveFFT()
+        
+        ax.axhline(y=self.waveform.offset, color='black', linewidth=0.4, label='Offset')
+        ax.axhline(y=self.waveform.peakToPeak+self.waveform.offset, color='black', linestyle='--', linewidth=0.3, label='RMS Line')
+        ax.axhline(y=-self.waveform.peakToPeak+self.waveform.offset, color='black', linestyle='--', linewidth=0.3, label='RMS Line')
+
+        stats_text = f"Amplitude : {self.waveform.peakToPeak:.2f} ADC\nFrequency : {self.waveform.frequencyFFT*10**(-6):.2f} MHz\nOffset : {self.waveform.offset:.2f} ADC"
+        
+        ax.text(0.97, 0.97, stats_text, verticalalignment='top', horizontalalignment='right',
+            transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.5))
+
+        self.draw()
+
     def plotFFT(self):
         self.figure.clear()
         
@@ -178,7 +242,7 @@ class PlotCanvas(FigureCanvasTkAgg):
         
         axFreq = self.figure.add_subplot(111)
         
-        axFreq.plot(self.waveform.xf*10**(-6), self.waveform.mag_spectrum, label='scipy FFT')
+        axFreq.plot(self.waveform.xf*10**(-6), 20 * np.log10(self.waveform.mag_spectrum), label='scipy FFT')
         
         axFreq.set_title(self.title)
         axFreq.set_xlabel("Frequency (MHz)")
