@@ -73,28 +73,21 @@ class PlotCanvas(FigureCanvasTkAgg):
         self.figure.clear()
         
         ax = self.figure.add_subplot(111)
-        
-        ax.plot(self.waveform.timelist*10**9, self.waveform.waveform)
-        
-        ax.set_title(self.title)
-        ax.set_xlabel('time (ns)')
-        ax.set_ylabel('ADC Counts', labelpad=-3.5)
-        
-        self.waveform.setRMS()
-        self.waveform.setOffset()
-        
-        ax.axhline(y=self.waveform.offset, color='black', linewidth=0.4, label='Offset')
-        
-        try:
-            self.waveform.frequencyFFT
-        except:
-            self.waveform.setWaveFFT()
-            
-        stats_text = f"RMS : {self.waveform.RMS:.2f} ADC\nFrequency : {self.waveform.frequencyFFT*10**(-6):.2f} MHz\nOffset : {self.waveform.offset:.2f} ADC"
-        
-        ax.text(0.97, 0.97, stats_text, verticalalignment='top', horizontalalignment='right',
-            transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.5))
 
+        self.waveform.plotWaveform(ax, self.title)
+    
+        self.draw()
+
+        
+    def plotFFT(self):
+        self.figure.clear()
+        
+        self.waveform.doFFTs()
+        
+        axFreq = self.figure.add_subplot(111)
+
+        self.waveform.plotFFT(axFreq, self.title)
+        
         self.draw()
 
     def plotPulseWave(self):
@@ -235,27 +228,27 @@ class PlotCanvas(FigureCanvasTkAgg):
 
         self.draw()
 
-    def plotFFT(self):
-        self.figure.clear()
+    # def plotFFT(self):
+    #     self.figure.clear()
         
-        self.waveform.doFFTs()
+    #     self.waveform.doFFTs()
         
-        axFreq = self.figure.add_subplot(111)
+    #     axFreq = self.figure.add_subplot(111)
         
-        axFreq.plot(self.waveform.xf*10**(-6), 20 * np.log10(self.waveform.mag_spectrum), label='scipy FFT')
+    #     axFreq.plot(self.waveform.xf*10**(-6), 20 * np.log10(self.waveform.mag_spectrum), label='scipy FFT')
         
-        axFreq.set_title(self.title)
-        axFreq.set_xlabel("Frequency (MHz)")
-        axFreq.set_ylabel("Magnitude (arb.)")
+    #     axFreq.set_title(self.title)
+    #     axFreq.set_xlabel("Frequency (MHz)")
+    #     axFreq.set_ylabel("Magnitude (arb.)")
         
-        # axFreq.legend(loc='upper right')
+    #     # axFreq.legend(loc='upper right')
         
-        stats_text = f"Frequency : {self.waveform.frequencyFFT*10**(-6):.2f} MHz\nAmplitude : {self.waveform.amplitudeFFT:.2f} ADC"
+    #     stats_text = f"Frequency : {self.waveform.frequencyFFT*10**(-6):.2f} MHz\nAmplitude : {self.waveform.amplitudeFFT:.2f} ADC"
         
-        axFreq.text(0.97, 0.97, stats_text, verticalalignment='top', horizontalalignment='right',
-            transform=axFreq.transAxes, bbox=dict(facecolor='white', alpha=0.5))
+    #     axFreq.text(0.97, 0.97, stats_text, verticalalignment='top', horizontalalignment='right',
+    #         transform=axFreq.transAxes, bbox=dict(facecolor='white', alpha=0.5))
         
-        self.draw()
+    #     self.draw()
     
     def plotFit(self):
         self.figure.clear()

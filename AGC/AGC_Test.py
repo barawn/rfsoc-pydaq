@@ -24,7 +24,7 @@ class AGC_Test(AGC_Daq):
     def __init__(self,
                  root: tk.Tk,
                  frame: tk.Frame,
-                 numChannels: int = 4,
+                 numChannels: int = 2,
                  numSamples: int = 2**11,
                  channelName = ["","","","","","","",""]):
         super().__init__(root, frame, numChannels, numSamples, channelName)

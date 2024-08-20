@@ -18,15 +18,20 @@ from widgets.SubmitButton import submitButton
 from Biquad.BiquadNotebook import BiquadNotebook
 from waveframe.Waveframe import Waveframe
 
+from Waveforms.Waveform import Waveform
+from Waveforms.Filterred import Filterred
+from Waveforms.Gated import Gated
+from Waveforms.SimFilter import SimFilter
+
 logger = logging.getLogger(__name__)
 
 #FPGA Class
 class Biquad_Daq(RFSoC_Daq):
     def __init__(self,
-                 root: tk.Tk,
-                 frame: tk.Frame,
+                 root: tk.Tk = None,
+                 frame: tk.Frame = None,
                  numChannels: int = 4,
-                 numSamples: int = 2**11,
+                 numSamples: int = 2**10,
                  channelName = ["","","","","","","",""]):
         super().__init__(root, frame, numChannels, numSamples, channelName)
 
@@ -55,6 +60,8 @@ class Biquad_Daq(RFSoC_Daq):
         self.rfsocLoad("zcubiquad")
 
         self.set_coefs()
+
+        self.set_single_zero_fir()
 
         # self.setZero(0, 1)
         # self.sdv.write(0x00,1)
@@ -96,10 +103,10 @@ class Biquad_Daq(RFSoC_Daq):
     #Indepnedent single FIR (only zero)
     def set_single_zero_fir(self, A = None, B = None):
         if B is None:
-            self.sdv.write(0x04,np.round(self.B)*16384)
+            self.sdv.write(0x04,np.round(self.B*16384))
         else:
             np.round(B)
-            self.sdv.write(0x04,np.round(B)*16384)
+            self.sdv.write(0x04,np.round(B*16384))
 
         if A is None:
             self.sdv.write(0x04,self.A*16384)
@@ -110,77 +117,76 @@ class Biquad_Daq(RFSoC_Daq):
 
     #Introduce Pole terms to FIR
     def set_f_fir(self, Dff = None, X1:int = 0, X2:int = 0, X3:int = 0, X4:int = 0, X5:int = 0, X6:int = 0):
-        if Dff == None:
-            self.sdv.write(0x10, int(self.Dff*16384))
-            for i in range(self.M-2, 0, -1):
-                self.sdv.write(0x10,int(self.Xn[i]*16384))
-        else:
-            self.sdv.write(0x10, Dff*16384)
-            self.sdv.write(0x10, X6*16384)
-            self.sdv.write(0x10, X5*16384)
-            self.sdv.write(0x10, X4*16384)
-            self.sdv.write(0x10, X3*16384)
-            self.sdv.write(0x10, X2*16384)
-            self.sdv.write(0x10, X1*16384)
+        Dff = Dff if Dff is not None else self.Dff
+        X1 = X1 if X1 is not None else self.Xn[1]
+        X2 = X2 if X2 is not None else self.Xn[2]
+        X3 = X3 if X3 is not None else self.Xn[3]
+        X4 = X4 if X4 is not None else self.Xn[4]
+        X5 = X5 if X5 is not None else self.Xn[5]
+        X6 = X6 if X6 is not None else self.Xn[6]
+        
+        self.sdv.write(0x10, int(np.round(Dff * 16384)))
+        Xn = [X6, X5, X4, X3, X2, X1]
+
+        for x in Xn:
+            self.sdv.write(0x10, int(np.round(x * 16384)))
+
         self.sdv.write(0x00,1)
 
-    def set_g_fir(self,Egg = None, X1:int = 0, X2:int = 0, X3:int = 0, X4:int = 0, X5:int = 0, X6:int = 0, X7:int = 0):
-        if Egg is None:
-            self.sdv.write(0x14,int(self.Egg*16384))
+    def set_g_fir(self, Egg=None, X1=None, X2=None, X3=None, X4=None, X5=None, X6=None, X7=None):
+        Egg = Egg if Egg is not None else self.Egg
+        X1 = X1 if X1 is not None else self.Xn[1]
+        X2 = X2 if X2 is not None else self.Xn[2]
+        X3 = X3 if X3 is not None else self.Xn[3]
+        X4 = X4 if X4 is not None else self.Xn[4]
+        X5 = X5 if X5 is not None else self.Xn[5]
+        X6 = X6 if X6 is not None else self.Xn[6]
+        X7 = X7 if X7 is not None else self.Xn[7]
 
-            for i in range(self.M-1, 0, -1):
-                self.sdv.write(0x14,int(self.Xn[i]*16384))
 
-        else:
-            self.sdv.write(0x14,Egg*16384)
-
-            self.sdv.write(0x14, X7*16384)
-            self.sdv.write(0x14, X6*16384)
-            self.sdv.write(0x14, X5*16384)
-            self.sdv.write(0x14, X4*16384)
-            self.sdv.write(0x14, X3*16384)
-            self.sdv.write(0x14, X2*16384)
-            self.sdv.write(0x14, X1*16384)
+        self.sdv.write(0x10, int(np.round(Egg * 16384)))
+        
+        Xn = [X7, X6, X5, X4, X3, X2, X1]
+        for x in Xn:
+            self.sdv.write(0x10, int(np.round(x * 16384)))
 
         self.sdv.write(0x00,1)
 
     #Finalise 2 clock delay to FIR -> IIR
     def set_F_fir(self, Dfg = None):
-        if Dfg is None:
-            self.sdv.write(0x18,int(self.Dfg))
-        else:
-            self.sdv.write(0x18,Dfg*16384)
+        Dfg = Dfg if Dfg is not None else self.Dfg
+
+        self.sdv.write(0x10, int(np.round(Dfg * 16384)))
+
         self.sdv.write(0x00,1)
     
     def set_G_fir(self, Egf = None):
-        if Egf is None:
-            self.sdv.write(0x1C,int(self.Egf))
-        else:
-            self.sdv.write(0x1C,Egf*16384)
+        Egf = Egf if Egf is not None else self.Egf
+
+        self.sdv.write(0x10, int(np.round(Egf * 16384)))
+        
         self.sdv.write(0x00,1)
 
     #Set IIR matrix coefficients
-    def set_pole_coef(self, C0 = None, C1:int = None, C2:int = None, C3:int = None):
-        if C0 is None:
-            self.sdv.write(0x08,int(self.C2*16384))
-            self.sdv.write(0x08,int(self.C3*16384))
-            self.sdv.write(0x08,int(self.C1*16384))
-            self.sdv.write(0x08,int(self.C0*16384))
-        else:
-            self.sdv.write(0x08,C2*16384)
-            self.sdv.write(0x08,C3*16384)
-            self.sdv.write(0x08,C1*16384)
-            self.sdv.write(0x08,C0*16384)
-        self.sdv.write(0x00,1)
+    def set_pole_coef(self, C0=None, C1=None, C2=None, C3=None):
+        C0 = C0 if C0 is not None else self.C0
+        C1 = C1 if C1 is not None else self.C1
+        C2 = C2 if C2 is not None else self.C2
+        C3 = C3 if C3 is not None else self.C3
 
-    def set_incremental(self, a1 = None,a2:int = None):
-        if a1 is None:
-            self.sdv.write(0x0C,int(self.a1*16384))
-            self.sdv.write(0x0C,int(self.a2*16384))
-        else:
-            self.sdv.write(0x0C,a1*16384)
-            self.sdv.write(0x0C,a2*16384)
-        self.sdv.write(0x00,1)
+        self.sdv.write(0x08, int(np.round(C2 * 16384)))
+        self.sdv.write(0x08, int(np.round(C3 * 16384)))
+        self.sdv.write(0x08, int(np.round(C1 * 16384)))
+        self.sdv.write(0x08, int(np.round(C0 * 16384)))
+        self.sdv.write(0x00, 1)
+
+    def set_incremental(self, a1 = None, a2 = None):
+        a1 = a1 if a1 is not None else self.a1
+        a2 = a2 if a2 is not None else self.a2
+
+        self.sdv.write(0x08, int(np.round(a1 * 16384)))
+        self.sdv.write(0x08, int(np.round(a2 * 16384)))
+        self.sdv.write(0x00, 1)
 
     def update(self):
         self.set_single_zero_fir()
@@ -190,19 +196,45 @@ class Biquad_Daq(RFSoC_Daq):
         # self.set_G_fir()
         # self.set_pole_coef()
         # self.set_incremental()
-        logger.debug("Updating the filter coefficients")
 
     ############################
     ##Gets
     ############################
 
+    def get_Xns(self):
+        return np.round(self.Xn*16384)/16384
+        
+    def get_crosslink(self):
+        return [np.round(self.Dff*16384)/16384, np.round(self.Egg*16384)/16384, np.round(self.Dfg*16384)/16384, np.round(self.Egf*16384)/16384]
+
+    def get_poleCoef(self):
+        return [np.round(self.C0*16384)/16384, np.round(self.C1*16384)/16384, np.round(self.C2*16384)/16384, np.round(self.C3*16384)/16384]
+
+    def get_incremental(self):
+        return [np.round(self.a1*16384)/16384, np.round(self.a2*16384)/16384]
+
+    def get_coeffs(self):
+        return self.get_Xns(), self.get_crosslink(), self.get_poleCoef(), self.get_incremental()
+
+    ############################
+    ##Prints
+    ############################
     def printPoles(self):
-        pole1, pole2 = self.poles()
+        pole1, pole2 = self.calc_poles()
         print(f"Poles are : {pole1} || {pole2}")
         logger.debug(f"Poles are : {pole1} || {pole2}")
 
-    def printCoef(self):
+    def printParams(self):
         print(f"A : {self.A}\nB : {self.B}\nP : {self.P}\nTheta : {self.theta}\nM : {self.M}")
+
+    def printCoeffs(self):
+        print(f"X1 : {self.Xn[1]}\nX2 : {self.Xn[2]}\nX3 : {self.Xn[3]}\nX4 : {self.Xn[4]}\nX5 : {self.Xn[5]}\nX6 : {self.Xn[6]}\nX7 : {self.Xn[7]}\n")
+
+        print(f"\nDff : {self.Dff}\nEgg : {self.Egg}\nDfg : {self.Dfg}\nEgf : {self.Egf}\n")
+
+        print(f"\nC0 : {self.C0}\nC1 : {self.C1}\nC2 : {self.C2}\nC3 : {self.C3}\n")
+
+        print(f"\na1 : {self.a1}\na2 : {self.a2}")
 
     ############################
     ##Calcs
@@ -218,29 +250,31 @@ class Biquad_Daq(RFSoC_Daq):
         for n in range(self.M):
             self.Xn[n] = self.P**n * self.chebyshev(n)
 
+        self.Xn[0] = 1
+
     def set_Dff(self):
-        self.Dff = -1 * self.P**self.M * self.chebyshev(self.M-2)
+        self.Dff = -1 * (self.P**self.M) * self.chebyshev(self.M - 2)
 
     def set_Egg(self):
         self.Egg = self.P**self.M * self.chebyshev(self.M)
     
     def set_Dfg(self):
-        self.Dfg = self.P**(self.M-1) * self.chebyshev(self.M-1)
+        self.Dfg = self.P**(self.M - 1) * self.chebyshev(self.M - 1)
 
     def set_Egf(self):
-        self.Egf = -1 * self.P**(self.M+1) * self.chebyshev(self.M-1)
-
+        self.Egf = -1 * (self.P**(self.M + 1)) * self.chebyshev(self.M - 1)
+    
     def set_C0(self):
-        self.C0 = self.P**(2*self.M) * (self.chebyshev(self.M-2)**2 - self.chebyshev(self.M-1)**2)
+        self.C0 = self.P**(2*self.M) * (self.chebyshev(self.M - 2)**2 - self.chebyshev(self.M - 1)**2)
     
     def set_C1(self):
-        self.C1 = self.P**(2*self.M - 1) * self.chebyshev(self.M-1) * (self.chebyshev(self.M) - self.chebyshev(self.M-2))
+        self.C1 = self.P**(2*self.M - 1) * self.chebyshev(self.M - 1) * (self.chebyshev(self.M) - self.chebyshev(self.M - 2))
     
     def set_C2(self):
-        self.C2 = self.P**(2*self.M + 1) * self.chebyshev(self.M-1) * (self.chebyshev(self.M-2) - self.chebyshev(self.M))
-
+        self.C2 = self.P**(2*self.M + 1) * self.chebyshev(self.M - 1) * (self.chebyshev(self.M - 2) - self.chebyshev(self.M))
+    
     def set_C3(self):
-        self.C3 = self.P**(2*self.M) * (self.chebyshev(self.M)**2 - self.chebyshev(self.M-1)**2)
+        self.C3 = self.P**(2*self.M) * (self.chebyshev(self.M)**2 - self.chebyshev(self.M - 1)**2)
     
     def set_a1(self):
         self.a1 = 2*self.P*np.cos(self.theta)
@@ -309,20 +343,13 @@ class Biquad_Daq(RFSoC_Daq):
         submits = {}
         submits['SetA'] = submitButton(submit, "Set A:", 0, lambda: self.submitAValue(submits['SetA']), 10)
         submits['SetB'] = submitButton(submit, "Set B:", 1, lambda: self.submitBValue(submits['SetB']), 11)
-        submits['SetP'] = submitButton(submit, "Set P:", 1, lambda: self.submitPValue(submits['SetP']), 12)
-        submits['SetTheta'] = submitButton(submit, "Set Theta * pi :", 0, lambda: self.submitThetaValue(submits['SetTheta']), 13)
+        submits['SetP'] = submitButton(submit, "Set P:", 0, lambda: self.submitPValue(submits['SetP']), 12)
+        submits['SetTheta'] = submitButton(submit, "Set Theta * pi :", 1, lambda: self.submitThetaValue(submits['SetTheta']), 13)
     
     ############################
     ##DAQ Methods
     # I woudln't touch
     ############################
-
-    def startWaveFrame(self):
-        for i in range(self.numChannels):
-            self.wf.addWaveframe(Waveframe(self.wf, i, self.channelName[i].split()[0], BiquadNotebook))
-            logger.debug(f"Waveframe {i} has been made")
-        self.wf.packFrames()
-        self.wf.pack()
 
     def rfsocLoad(self, hardware = None):
         super().rfsocLoad(hardware)
@@ -332,6 +359,26 @@ class Biquad_Daq(RFSoC_Daq):
         except:
             logger.debug("It would appear the overloay you have tried to load doesn't contain SerialCOBSDevice")
         return
+
+    def GuiAcquire(self):
+        self.rfsocAcquire()
+        arr = [Gated,Gated,Filterred,Filterred]
+        for i in range(self.numChannels):
+            self.wf.waveframes[i].setWaveform(arr[i](self.adcBuffer[i] >> 4))
+            if self.wf.waveframes[i].toPlot == True:
+                self.wf.waveframes[i].notebook.plot()
+                
+        logger.debug("Acquired data and Plotted")
+
+    def JupyterAcquire(self):
+        self.rfsocAcquire()
+        
+        self.waveforms = []
+        
+        self.waveforms.append(Gated(self.adcBuffer[0] >> 4))
+        self.waveforms.append(Gated(self.adcBuffer[1] >> 4))
+        self.waveforms.append(Filterred(self.adcBuffer[2] >> 4))
+        # self.waveforms.append(Filterred(self.adcBuffer[3] >> 4))
 
 if __name__ == '__main__':
     pass

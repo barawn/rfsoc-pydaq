@@ -22,6 +22,10 @@ try:
 except:
     pass
 
+
+
+######This is now redundant and should probably be moved
+
 class BiquadNotebook(Notebook):
     def __init__(self, frame: ttk.Frame, figsize: tuple, index: int = None):
         super().__init__(frame, figsize)

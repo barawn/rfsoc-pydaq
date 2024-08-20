@@ -18,6 +18,9 @@ from widgets.SubmitButton import submitButton
 from AGC.AgcNotebook import AgcNotebook
 from waveframe.Waveframe import Waveframe
 
+from Waveforms.Waveform import Waveform
+from Waveforms.AGC import AGC
+
 logger = logging.getLogger(__name__)
 
 #FPGA Class
@@ -28,9 +31,9 @@ class AGC_Daq(RFSoC_Daq):
     Should only be ammended with core agc methods/protocols
     """
     def __init__(self,
-                 root: tk.Tk,
-                 frame: tk.Frame,
-                 numChannels: int = 4,
+                 root: tk.Tk = None,
+                 frame: tk.Frame = None,
+                 numChannels: int = 2,
                  numSamples: int = 2**11,
                  channelName = ["","","","","","","",""]):
         super().__init__(root, frame, numChannels, numSamples, channelName)
@@ -166,13 +169,6 @@ class AGC_Daq(RFSoC_Daq):
     # I woudln't touch
     ############################
 
-    def startWaveFrame(self):
-        for i in range(self.numChannels):
-            self.wf.addWaveframe(Waveframe(self.wf, i, self.channelName[i].split()[0], AgcNotebook))
-            logger.debug(f"Waveframe {i} has been made")
-        self.wf.packFrames()
-        self.wf.pack()
-
     def rfsocLoad(self, hardware = None):
         super().rfsocLoad(hardware)
         try:
@@ -181,6 +177,25 @@ class AGC_Daq(RFSoC_Daq):
         except:
             logger.debug("It would appear the overloay you have tried to load doesn't contain SerialCOBSDevice")
         return
+    
+
+    def GuiAcquire(self):
+        self.rfsocAcquire()
+        arr = [AGC,Waveform]
+        for i in range(self.numChannels):
+            self.wf.waveframes[i].setWaveform(arr[i](self.adcBuffer[i] >> 4))
+            if self.wf.waveframes[i].toPlot == True:
+                self.wf.waveframes[i].notebook.plot()
+                
+        logger.debug("Acquired data and Plotted")
+
+    def JupyterAcquire(self):
+        self.rfsocAcquire()
+        
+        self.waveforms = []
+        
+        self.waveforms.append(AGC(self.adcBuffer[0] >> 4))
+        self.waveforms.append(Waveform(self.adcBuffer[1] >> 4))
 
 if __name__ == '__main__':
     pass

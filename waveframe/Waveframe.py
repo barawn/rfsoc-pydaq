@@ -61,7 +61,8 @@ class Waveframe(tk.Frame):
         
         super().__init__(self.parent)
         
-        self.notebook = notebookClass(self, self.parent.figsize, self.index)
+        ##
+        self.notebook = Notebook(self, self.parent.figsize, self.index)
 
         self.btns = {}
         
@@ -87,8 +88,8 @@ class Waveframe(tk.Frame):
         # Callback signature is data, figure, canvas
         self.user_callback = None
     
-    def setWaveform(self, data):
-        self.waveform = Waveform(data)
+    def setWaveform(self, data:Waveform):
+        self.waveform = data
         self.notebook.setWaveform(self.waveform)
 
     #Saving

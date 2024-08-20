@@ -3,15 +3,10 @@
 ##Python Imports
 import numpy as np
 import tkinter as tk
-from tkinter import filedialog
-from scipy.fft import fft, ifft, fftfreq
-from scipy.constants import speed_of_light
-from typing import Callable
 
 #System Imports
 import logging
-import subprocess
-import os, sys, inspect, importlib, configparser, csv
+import os, sys, configparser
 
 from textconsole.TextConsole import TextConsole
 from scrolledlog.ScrolledLog import ScrolledLog
@@ -25,6 +20,8 @@ from Biquad.Biquad_Test import Biquad_Test
 from Pulse.Pulse_Daq import Pulse_Daq
 from Sine.Sine_Daq import Sine_Daq
 from widgets.SubmitButton import submitButton
+
+from waveframe.Waveframes import Waveframes
 
 default_numChannels = 4
 default_numSamples = 2**5
@@ -56,6 +53,8 @@ def app(name):
                                       fallback=default_numSamples),
                     pydaq_cfg.get('channels', '').split(','))
 
+    daq.startWaveFrame()
+
     displayFrame.grid( row = 0, column=0, sticky="NSEW" )
 
 
@@ -73,7 +72,7 @@ def app(name):
                                 command = daq.rfsocLoad)
     buttons['Acquire'] = tk.Button(buttonFrame,
                                    text = "Acquire",
-                                   command = daq.rfsocAcquire)
+                                   command = daq.GuiAcquire)
     ##This button throws an error but doesn't stop the program. May as well be ignored till it works
     # buttons['Restart'] = tk.Button(buttonFrame,
     #                             text = "Restart",
@@ -142,6 +141,7 @@ def app(name):
     # idk = root.nametowidget("display")
 
     try:
+        daq.setHotKeys()
         daq.setDisplay()
     except:
         pass

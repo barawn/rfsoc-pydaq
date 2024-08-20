@@ -15,6 +15,8 @@ import os, sys, inspect, importlib, configparser, csv
 from waveframe.Waveframe import Waveframe
 from waveframe.Waveframes import Waveframes
 
+from Waveforms.Waveform import Waveform
+
 logger = logging.getLogger(__name__)
 
 #FPGA Class
@@ -56,14 +58,13 @@ class RFSoC_Daq:
         #Inititalising instance attributes
         self.adcBuffer = np.zeros( (numChannels, numSamples), np.int16 )
         self.dev = None
-        self.wf = Waveframes(self.frame, self.numChannels)
 
-        self.startWaveFrame()
-        self.setHotKeys()
+        self.wf = None
 
     def startWaveFrame(self):
+        self.wf = Waveframes(self.frame, self.numChannels)
         for i in range(self.numChannels):
-            self.wf.addWaveframe(Waveframe(self.wf, i, self.channelName[i]))
+            self.wf.addWaveframe(Waveframe(self.wf, i, self.channelName[i].split()[0]))
             logger.debug(f"Waveframe {i} has been made")
         self.wf.packFrames()
         self.wf.pack()
@@ -216,7 +217,7 @@ class RFSoC_Daq:
         self.root.bind("<F3>", lambda event: self.wf.waveframes[2].btns['Enlarge'].invoke())
         self.root.bind("<F4>", lambda event: self.wf.waveframes[3].btns['Enlarge'].invoke())
         
-        self.root.bind("<F5>", lambda event: self.rfsocAcquire())
+        self.root.bind("<F5>", lambda event: self.GuiAcquire())
         
         self.root.bind("<F9>", lambda event: self.switchToTab(0))
         self.root.bind("<F10>", lambda event: self.switchToTab(1))
@@ -225,6 +226,10 @@ class RFSoC_Daq:
         
         self.root.bind("<Next>", lambda event: self.switchTab())
         self.root.bind("<Prior>", lambda event: self.switchTabBack())
+
+
+        def setDisplay(self):
+            pass
 
 
     ############################
@@ -311,7 +316,7 @@ class RFSoC_Daq:
             logger.error("No RFSoC device is loaded!")
         self.dev.internal_capture(self.adcBuffer, self.numChannels)
         for ch in Ch:
-            self.wf.waveframes[ch].setWaveform(self.adcBuffer[ch] >> 4)
+            self.wf.waveframes[ch].setWaveform(Waveform(self.adcBuffer[ch] >> 4))
         logger.debug("Acquired data")
     
     def rfsocAcquire(self):
@@ -320,13 +325,26 @@ class RFSoC_Daq:
             
         self.dev.internal_capture(self.adcBuffer,
                                     self.numChannels)
-        
+
+    def GuiAcquire(self):
+        self.rfsocAcquire()
         for i in range(self.numChannels):
-            self.wf.waveframes[i].setWaveform(self.adcBuffer[i] >> 4)
+            self.wf.waveframes[i].setWaveform(Waveform(self.adcBuffer[i] >> 4))
             if self.wf.waveframes[i].toPlot == True:
                 self.wf.waveframes[i].notebook.plot()
                 
         logger.debug("Acquired data and Plotted")
+
+    def JupyterAcquire(self):
+        self.rfsocAcquire()
+        
+        self.waveforms = []
+        
+        self.waveforms.append(Waveform(self.adcBuffer[0] >> 4))
+        self.waveforms.append(Waveform(self.adcBuffer[1] >> 4))
+        self.waveforms.append(Waveform(self.adcBuffer[2] >> 4))
+        self.waveforms.append(Waveform(self.adcBuffer[3] >> 4))
+
 
 
 if __name__ == '__main__':
