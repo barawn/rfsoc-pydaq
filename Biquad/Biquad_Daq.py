@@ -99,24 +99,34 @@ class Biquad_Daq(RFSoC_Daq):
         self.set_As()
         self.set_crosslink()
         self.set_iir_coefs()
+
+    def reset(self):
+        self.setA(0)
+        self.setB(0)
+        self.setP(0)
+        self.set_single_zero_fir(0,0)
+        self.set_f_fir(0,0,0,0,0,0,0)
+        self.set_g_fir(0,0,0,0,0,0,0,0)
+        self.set_F_fir(0)
+        self.set_G_fir(0)
+        self.set_pole_coef(0,0,0,0)
+        self.set_incremental(0,0)
+        
     
     #Indepnedent single FIR (only zero)
     def set_single_zero_fir(self, A = None, B = None):
-        if B is None:
-            self.sdv.write(0x04,np.round(self.B*16384))
-        else:
-            np.round(B)
-            self.sdv.write(0x04,np.round(B*16384))
+        A = A if A is not None else self.A
+        B = B if B is not None else self.B
+        
+        self.A = A
+        self.B = B
 
-        if A is None:
-            self.sdv.write(0x04,self.A*16384)
-        else:
-            np.round(A)
-            self.sdv.write(0x04,A*16384)
+        self.sdv.write(0x04,self.calc_18_bit(B))
+        self.sdv.write(0x04,self.calc_18_bit(A))
         self.sdv.write(0x00,1)
 
     #Introduce Pole terms to FIR
-    def set_f_fir(self, Dff = None, X1:int = 0, X2:int = 0, X3:int = 0, X4:int = 0, X5:int = 0, X6:int = 0):
+    def set_f_fir(self, Dff = None, X1 = None, X2 = None, X3 = None, X4 = None, X5 = None, X6 = None):
         Dff = Dff if Dff is not None else self.Dff
         X1 = X1 if X1 is not None else self.Xn[1]
         X2 = X2 if X2 is not None else self.Xn[2]
@@ -124,12 +134,20 @@ class Biquad_Daq(RFSoC_Daq):
         X4 = X4 if X4 is not None else self.Xn[4]
         X5 = X5 if X5 is not None else self.Xn[5]
         X6 = X6 if X6 is not None else self.Xn[6]
+
+        self.Dff = Dff
+        self.Xn[1] = X1
+        self.Xn[2] = X2
+        self.Xn[3] = X3
+        self.Xn[4] = X4
+        self.Xn[5] = X5
+        self.Xn[6] = X6
         
-        self.sdv.write(0x10, int(np.round(Dff * 16384)))
+        self.sdv.write(0x10, self.calc_18_bit(Dff))
         Xn = [X6, X5, X4, X3, X2, X1]
 
         for x in Xn:
-            self.sdv.write(0x10, int(np.round(x * 16384)))
+            self.sdv.write(0x10, self.calc_18_bit(x))
 
         self.sdv.write(0x00,1)
 
@@ -143,12 +161,20 @@ class Biquad_Daq(RFSoC_Daq):
         X6 = X6 if X6 is not None else self.Xn[6]
         X7 = X7 if X7 is not None else self.Xn[7]
 
+        self.Egg = Egg
+        self.Xn[1] = X1
+        self.Xn[2] = X2
+        self.Xn[3] = X3
+        self.Xn[4] = X4
+        self.Xn[5] = X5
+        self.Xn[6] = X6
+        self.Xn[7] = X7
 
-        self.sdv.write(0x10, int(np.round(Egg * 16384)))
+        self.sdv.write(0x14, self.calc_18_bit(Egg))
         
         Xn = [X7, X6, X5, X4, X3, X2, X1]
         for x in Xn:
-            self.sdv.write(0x10, int(np.round(x * 16384)))
+            self.sdv.write(0x14, self.calc_18_bit(x))
 
         self.sdv.write(0x00,1)
 
@@ -156,14 +182,18 @@ class Biquad_Daq(RFSoC_Daq):
     def set_F_fir(self, Dfg = None):
         Dfg = Dfg if Dfg is not None else self.Dfg
 
-        self.sdv.write(0x10, int(np.round(Dfg * 16384)))
+        self.Dfg = Dfg
+
+        self.sdv.write(0x18, self.calc_18_bit(Dfg))
 
         self.sdv.write(0x00,1)
     
     def set_G_fir(self, Egf = None):
         Egf = Egf if Egf is not None else self.Egf
 
-        self.sdv.write(0x10, int(np.round(Egf * 16384)))
+        self.Egf = Egf
+
+        self.sdv.write(0x1C, self.calc_18_bit(Egf))
         
         self.sdv.write(0x00,1)
 
@@ -174,18 +204,26 @@ class Biquad_Daq(RFSoC_Daq):
         C2 = C2 if C2 is not None else self.C2
         C3 = C3 if C3 is not None else self.C3
 
-        self.sdv.write(0x08, int(np.round(C2 * 16384)))
-        self.sdv.write(0x08, int(np.round(C3 * 16384)))
-        self.sdv.write(0x08, int(np.round(C1 * 16384)))
-        self.sdv.write(0x08, int(np.round(C0 * 16384)))
+        self.C0 = C0
+        self.C1 = C1
+        self.C2 = C2
+        self.C3 = C3
+
+        self.sdv.write(0x08, self.calc_18_bit(C2))
+        self.sdv.write(0x08, self.calc_18_bit(C3))
+        self.sdv.write(0x08, self.calc_18_bit(C1))
+        self.sdv.write(0x08, self.calc_18_bit(C0))
         self.sdv.write(0x00, 1)
 
     def set_incremental(self, a1 = None, a2 = None):
         a1 = a1 if a1 is not None else self.a1
         a2 = a2 if a2 is not None else self.a2
 
-        self.sdv.write(0x08, int(np.round(a1 * 16384)))
-        self.sdv.write(0x08, int(np.round(a2 * 16384)))
+        self.a1 = a1
+        self.a2 = a2
+
+        self.sdv.write(0x0C, self.calc_18_bit(a1))
+        self.sdv.write(0x0C, self.calc_18_bit(a2))
         self.sdv.write(0x00, 1)
 
     def update(self):
@@ -202,19 +240,22 @@ class Biquad_Daq(RFSoC_Daq):
     ############################
 
     def get_Xns(self):
-        return np.round(self.Xn*16384)/16384
+        return self.calc_4_bit_array(self.Xn)
         
     def get_crosslink(self):
-        return [np.round(self.Dff*16384)/16384, np.round(self.Egg*16384)/16384, np.round(self.Dfg*16384)/16384, np.round(self.Egf*16384)/16384]
+        return [self.calc_4_bit(self.Dff), self.calc_4_bit(self.Egg), self.calc_4_bit(self.Dfg), self.calc_4_bit(self.Egf)]
 
     def get_poleCoef(self):
-        return [np.round(self.C0*16384)/16384, np.round(self.C1*16384)/16384, np.round(self.C2*16384)/16384, np.round(self.C3*16384)/16384]
+        return [self.calc_4_bit(self.C0), self.calc_4_bit(self.C1), self.calc_4_bit(self.C2), self.calc_4_bit(self.C3)]
 
     def get_incremental(self):
-        return [np.round(self.a1*16384)/16384, np.round(self.a2*16384)/16384]
+        return [self.calc_4_bit(self.a1), self.calc_4_bit(self.a2)]
+    
+    def get_zero(self):
+        return [self.calc_4_bit(self.A), self.calc_4_bit(self.B)]
 
     def get_coeffs(self):
-        return self.get_Xns(), self.get_crosslink(), self.get_poleCoef(), self.get_incremental()
+        return self.get_Xns(), self.get_crosslink(), self.get_poleCoef(), self.get_incremental(), self.get_zero()
 
     ############################
     ##Prints
@@ -225,20 +266,38 @@ class Biquad_Daq(RFSoC_Daq):
         logger.debug(f"Poles are : {pole1} || {pole2}")
 
     def printParams(self):
-        print(f"A : {self.A}\nB : {self.B}\nP : {self.P}\nTheta : {self.theta}\nM : {self.M}")
+        print(f"A : {self.calc_4_bit(self.A)}\nB : {self.calc_4_bit(self.B)}\nP : {self.calc_4_bit(self.P)}\nTheta : {self.calc_4_bit(self.theta)}")
 
     def printCoeffs(self):
-        print(f"X1 : {self.Xn[1]}\nX2 : {self.Xn[2]}\nX3 : {self.Xn[3]}\nX4 : {self.Xn[4]}\nX5 : {self.Xn[5]}\nX6 : {self.Xn[6]}\nX7 : {self.Xn[7]}\n")
+        print(f"X1 : {self.calc_4_bit(self.Xn[1])}\nX2 : {self.calc_4_bit(self.Xn[2])}\nX3 : {self.calc_4_bit(self.Xn[3])}\nX4 : {self.calc_4_bit(self.Xn[4])}\nX5 : {self.calc_4_bit(self.Xn[5])}\nX6 : {self.calc_4_bit(self.Xn[6])}\nX7 : {self.calc_4_bit(self.Xn[7])}\n")
 
-        print(f"\nDff : {self.Dff}\nEgg : {self.Egg}\nDfg : {self.Dfg}\nEgf : {self.Egf}\n")
+        print(f"\nDff : {self.calc_4_bit(self.Dff)}\nEgg : {self.calc_4_bit(self.Egg)}\nDfg : {self.calc_4_bit(self.Dfg)}\nEgf : {self.calc_4_bit(self.Egf)}\n")
 
-        print(f"\nC0 : {self.C0}\nC1 : {self.C1}\nC2 : {self.C2}\nC3 : {self.C3}\n")
+        print(f"\nC0 : {self.calc_4_bit(self.C0)}\nC1 : {self.calc_4_bit(self.C1)}\nC2 : {self.calc_4_bit(self.C2)}\nC3 : {self.calc_4_bit(self.C3)}\n")
 
-        print(f"\na1 : {self.a1}\na2 : {self.a2}")
+        print(f"\na1 : {self.calc_4_bit(self.a1)}\na2 : {self.calc_4_bit(self.a2)}")
 
     ############################
     ##Calcs
     ############################
+
+    ##Converts normal input to what the Firmware can read
+    def calc_18_bit(self, value):
+        return int(np.round(value * 16384))
+
+    ##Expects the 4_bit input (type float)
+    ##Calculates what happens when otuside [-8,8)
+    def calc_4_bit(self, value, scale_factor=16384):
+        scaled_value = np.round(value * scale_factor)
+        
+        wrapped_scaled_value = ((scaled_value + (8 * scale_factor)) % (16 * scale_factor)) - (8 * scale_factor)
+
+        fixed_point_value = wrapped_scaled_value / scale_factor
+        
+        return fixed_point_value
+
+    def calc_4_bit_array(self, values, scale_factor=16384):
+        return [self.calc_4_bit(value, scale_factor) for value in values]
 
     def calc_poles(self):
         return self.P*np.exp(1j * self.theta), self.P*np.exp(-1 * 1j * self.theta)

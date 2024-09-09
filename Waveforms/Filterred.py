@@ -8,7 +8,11 @@ from typing import List
 from .Waveform import Waveform
 
 class Filterred(Waveform):
-    def __init__(self, waveform: List, sampleRate = 3.E9, start=400, end=920):
+    ##Was 400->920
+    ##Now 424->952
+    ##Do additional multiple clocks for testing
+    def __init__(self, waveform: List, start=424, end=8*200, sampleRate = 3.E9):
+        ## start=280, end=800 for Simulation biquad
         super().__init__(waveform, sampleRate = 3.E9)
         
         self.shortenWaveform(start, end)

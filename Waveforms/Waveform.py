@@ -150,6 +150,30 @@ class Waveform():
         ax.text(0.97, 0.97, stats_text, verticalalignment='top', horizontalalignment='right',
             transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.5))
         
+    def plotClocks(self, clocks, ax: plt.Axes=None, title = None, figsize=(25, 15)):
+        if ax is None:
+            fig, ax = plt.subplots(figsize=figsize)
+
+
+        self.shortenWaveform(0,8*clocks)
+
+        x_axis = np.arange(len(self.waveform)) / 8
+
+        ax.plot(x_axis, self.waveform)
+
+        if title is not None:
+            ax.set_title(title)
+
+        ax.set_xlabel('Clocks')
+        ax.set_ylabel('ADC Counts', labelpad=-3.5)
+
+        self.setWaveFFT()
+        self.setPeaktoPeak()
+
+        stats_text = f"Peak-Peak : {self.peakToPeak:.2f} ADC\nFrequency : {self.frequencyFFT*10**(-6):.2f} MHz"
+        
+        ax.text(0.97, 0.97, stats_text, verticalalignment='top', horizontalalignment='right',
+            transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.5))
 
     def plotFFT(self, ax: plt.Axes=None, title = None, figsize=(25, 15)):
         if ax is None:

@@ -88,12 +88,12 @@ class SimBiquad():
         for n in range(self.M):
             self.Xn[n] = self.P**n * self.chebyshev(n)
 
-        self.Xn[0] = 1
+        # self.Xn[0] = 1
     
     def chebyshev(self, num):
         return np.sin((num + 1) * self.theta) / np.sin(self.theta)
     
-    def set_Dff(self):
+    def set_Dff(self, input = None):
         self.Dff = -1 * (self.P**self.M) * self.chebyshev(self.M - 2)
 
     def set_Egg(self):
@@ -133,8 +133,57 @@ class SimBiquad():
         self.set_C2()
         self.set_C3()
 
-    #Assuming params is the return from Biquad_Daq get_coeffs
-    def set_daq_coefs(self, params):
+    def to_4bit_signed(self, nested_values, scale_factor=16384):
+        processed_nested_values = []
+        
+        for sublist in nested_values:
+            processed_sublist = []
+            for value in sublist:
+                # Scale and round the value
+                scaled_value = np.round(value * scale_factor)
+                
+                # Handle wrapping for values outside the 4-bit signed integer range [-8, 7]
+                wrapped_scaled_value = ((scaled_value + (8 * scale_factor)) % (16 * scale_factor)) - (8 * scale_factor)
+                
+                # Convert back to floating-point representation
+                fixed_point_value = wrapped_scaled_value / scale_factor
+                
+                processed_sublist.append(fixed_point_value)
+            
+            processed_nested_values.append(processed_sublist)
+        
+        return processed_nested_values
+
+
+    def calc_12_bit(self, value):
+        # Define the range limits
+        min_val = -2048
+        max_val = 2048
+        
+        # Calculate the range width
+        range_width = max_val - min_val
+        
+        # Wrap the value around using modulo
+        wrapped_value = ((value - min_val) % range_width) + min_val
+        
+        return wrapped_value
+
+    def calc_12_bit_array(self, array):
+        # Define the range limits
+        min_val = -2048
+        max_val = 2048
+        
+        # Calculate the range width
+        range_width = max_val - min_val
+        
+        # Wrap the values around using modulo for the entire array
+        wrapped_array = ((array - min_val) % range_width) + min_val
+        
+        return wrapped_array
+
+
+    def set_daq_coeffs(self, params):
+        # params = self.to_4bit_signed(params)
         self.Xn = params[0]
 
         self.Dff = params[1][0]
@@ -149,17 +198,27 @@ class SimBiquad():
 
         self.a1 = params[3][0]
         self.a2 = params[3][1]
+
+        try:
+            
+            self.A = params[4][0]
+            self.B = params[4][1]
+        except:
+            pass
+
         
     def single_zero_fir(self):
         for b, clock in enumerate(self.clocks):
             for n, sample in enumerate(clock):
                 if b==0 and n == 0:
-                    self.u[b][n] = self.A * self.data[self.M*b+n]
+                    self.u[0][0] = self.A * self.data[0]
                 elif b==0 and n==1:
-                    self.u[b][n] = self.A * self.data[self.M*b+n] + self.B * self.data[self.M*b+n-1]
+                    self.u[0][1] = self.A * self.data[1] + self.B * self.data[0]
                 else:
-                    self.u[b][n] = self.A * self.data[self.M*b+n] + self.B * self.data[self.M*b+n-1] + self.A * self.data[self.M*b+n-2] 
-    
+                    self.u[b][n] = self.A * self.data[self.M*b+n] + self.B * self.data[self.M*b+n-1] + self.A * self.data[self.M*b+n-2]
+
+        self.u = np.floor(self.calc_12_bit_array(self.u))
+            
     def set_u(self):
         for b, clock in enumerate(self.clocks):
             for n, sample in enumerate(clock):
@@ -182,7 +241,7 @@ class SimBiquad():
             # self.f[b] = clock[0]
             # self.g[b] = clock[1] + (self.P * self.chebyshev(1) * clock[0])
             self.f[b] = self.u[b][0]
-            self.g[b] = self.u[b][1] + (self.P * self.chebyshev(1) * self.u[b][0])
+            self.g[b] = self.u[b][1] + (self.Xn[1] * self.u[b][0]) 
             
             #Previous clocks output
             if b>0:
@@ -233,16 +292,27 @@ class SimBiquad():
         
     def get_fir(self):
         return np.array([item for sublist in self.u for item in sublist])
+
+    def get_u(self):
+        result = np.zeros_like(self.y)
+        for b in range(self.length):
+            result[b, 0] = np.floor(self.calc_12_bit(self.u[b,0]))
+            result[b, 1] = np.floor(self.calc_12_bit(self.u[b,1]))
+        return result.flatten()
     
     def get_decimated1(self):
         result = np.zeros_like(self.y)
         for b in range(self.length):
-            result[b, 0] = self.f[b]
-            result[b, 1] = self.g[b]
+            result[b, 0] = self.calc_12_bit(np.floor(self.f[b]))
+            result[b, 1] = self.calc_12_bit(np.floor(self.g[b]))
         return result.flatten()
     
     def get_decimated2(self):
-        return np.array([val for pair in zip(self.F, self.G) for val in pair])
+        result = np.zeros_like(self.y)
+        for b in range(self.length):
+            result[b, 0] = np.floor(self.calc_12_bit(self.F[b]))
+            result[b, 1] = np.floor(self.calc_12_bit(self.G[b]))
+        return result.flatten()
         
     def get_biquad(self):
         return np.array([int(item) for sublist in self.y for item in sublist])
@@ -250,8 +320,8 @@ class SimBiquad():
     def get_decimated(self):
         result = np.zeros_like(self.y)
         for b in range(self.length):
-            result[b, 0] = self.y[b, 0]  # First output of the clock period
-            result[b, 1] = self.y[b, 1]  # Last output of the clock period
+            result[b, 0] = np.floor(self.calc_12_bit(self.y[b, 0]))  # First output of the clock period
+            result[b, 1] = np.floor(self.calc_12_bit(self.y[b, 1]))  # Last output of the clock period
         return result.flatten()
     
     

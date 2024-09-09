@@ -1,9 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from scipy.fft import fft
-from scipy.optimize import curve_fit
-from scipy.signal import find_peaks, peak_widths, butter, filtfilt, correlate, lombscargle
+from scipy.signal import lombscargle
 
 from typing import List
 
