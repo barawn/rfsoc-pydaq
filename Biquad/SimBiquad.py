@@ -11,6 +11,8 @@ from Waveforms.Filterred import Filterred
 
 class SimBiquad():
     def __init__(self, data, A=0, B=1, P=0, theta=np.pi, M=8):
+
+        ##Setting the parameters from initialisation
         self.A = A
         self.B = B
         self.P = P
@@ -21,6 +23,7 @@ class SimBiquad():
         self.data = data
         self.clocks = data.reshape(-1, 8)
         
+        ##Setting up the output values
         self.u = np.zeros((self.length, 8))
         self.y = np.zeros((self.length, 8))
         
@@ -29,6 +32,8 @@ class SimBiquad():
         self.F = np.zeros(self.length)
         self.G = np.zeros(self.length)
         
+
+        ##Setting up the coefficients
         self.Xn = np.zeros(M)
         
         self.C0 = 0 
@@ -44,6 +49,7 @@ class SimBiquad():
         self.a1 = 0
         self.a2 = 0
         
+        ##Will set the coefficients to calculated values
         self.set_Xn()
         self.set_Cross()
         self.set_Cs()
@@ -58,6 +64,7 @@ class SimBiquad():
 
     def setP(self,P):
         self.P=P
+        ##Since each depends on P
         self.set_Xn()
         self.set_Cross()
         self.set_Cs()
@@ -65,12 +72,15 @@ class SimBiquad():
 
     def setTheta(self,theta):
         self.theta = theta
+        ##Since each depends on Theta
         self.set_Xn()
         self.set_Cross()
         self.set_Cs()
         self.set_As()
 
     def setData(self, data):
+        ##For new daq acquires
+
         self.data = data
         
         self.clocks = data.reshape(-1, 8)
@@ -88,8 +98,6 @@ class SimBiquad():
         for n in range(self.M):
             self.Xn[n] = self.P**n * self.chebyshev(n)
 
-        # self.Xn[0] = 1
-    
     def chebyshev(self, num):
         return np.sin((num + 1) * self.theta) / np.sin(self.theta)
     
@@ -133,6 +141,7 @@ class SimBiquad():
         self.set_C2()
         self.set_C3()
 
+    ##This is currently redundant since the daq provides values in 4bit_signed
     def to_4bit_signed(self, nested_values, scale_factor=16384):
         processed_nested_values = []
         
@@ -154,7 +163,7 @@ class SimBiquad():
         
         return processed_nested_values
 
-
+    ##Converts to output bit width
     def calc_12_bit(self, value):
         # Define the range limits
         min_val = -2048
@@ -181,7 +190,7 @@ class SimBiquad():
         
         return wrapped_array
 
-
+    ##Input should be daq calculated Coefficients (divided by 2^14) so the sim has the exact same values as the daq
     def set_daq_coeffs(self, params):
         # params = self.to_4bit_signed(params)
         self.Xn = params[0]
@@ -206,70 +215,40 @@ class SimBiquad():
         except:
             pass
 
-        
     def single_zero_fir(self):
         for b, clock in enumerate(self.clocks):
             for n, sample in enumerate(clock):
-                if b==0 and n == 0:
-                    self.u[0][0] = self.A * self.data[0]
-                elif b==0 and n==1:
-                    self.u[0][1] = self.A * self.data[1] + self.B * self.data[0]
-                else:
-                    self.u[b][n] = self.A * self.data[self.M*b+n] + self.B * self.data[self.M*b+n-1] + self.A * self.data[self.M*b+n-2]
+                self.u[b][n] = self.clip_to_30_bits(self.A * self.data[self.M*b+n] + self.B * self.data[self.M*b+n-1] + self.A * self.data[self.M*b+n-2])
 
         self.u = np.floor(self.calc_12_bit_array(self.u))
-            
-    def set_u(self):
-        for b, clock in enumerate(self.clocks):
-            for n, sample in enumerate(clock):
-                self.u[b][n] = self.clocks[b][n]
-
-    def single_zero_fir2(self):
-        for b, clock in enumerate(self.clocks):
-            for n, sample in enumerate(clock):
-                place = self.M*b + n
-                if b==0 and n == 0:
-                    self.y[b][n] = self.A * self.y[place//self.M][place%self.M]
-                elif b==0 and n==1:
-                    self.y[b][n] = self.A * self.y[place//self.M][place%self.M] + self.y[(place-1)//self.M][(place-1)%self.M]
-                else:
-                    self.y[b][n] =self.A * self.y[place//self.M][place%self.M] + self.y[(place-1)//self.M][(place-1)%self.M] + self.A * self.y[(place-1)//self.M][(place-1)%self.M]
 
     def first_constants(self):
         for b, clock in enumerate(self.u):
             #Current clock single FIR output
-            # self.f[b] = clock[0]
-            # self.g[b] = clock[1] + (self.P * self.chebyshev(1) * clock[0])
+
             self.f[b] = self.u[b][0]
-            self.g[b] = self.u[b][1] + (self.Xn[1] * self.u[b][0]) 
+            self.g[b] = self.u[b][1] + (self.Xn[1] * self.u[b][0])
             
             #Previous clocks output
-            if b>0:
-                self.f[b] += self.Xn[1] * self.u[b - 1][self.M - 1]
-                
-                for i in range(2, self.M - 1):
-                    self.f[b] += self.Xn[i] * self.u[b - 1][self.M - i]
-                    self.g[b] += self.Xn[i] * self.u[b - 1][self.M - i + 1]
-                
-                self.g[b] += self.Xn[self.M - 1] * self.u[b - 1][2]
+
+            self.f[b] += self.Xn[1] * self.u[b - 1][self.M - 1]
+            
+            for i in range(2, self.M - 1):
+                self.f[b] += self.Xn[i] * self.u[b - 1][self.M - i]
+                self.g[b] += self.Xn[i] * self.u[b - 1][self.M - i + 1]
+            
+            self.g[b] += self.Xn[self.M - 1] * self.u[b - 1][2]
                     
     def second_constants(self):
-        self.F[0] = self.f[0]
-        self.G[0] = self.g[0]
-        for b in range(1, len(self.f)):
+        for b in range(0, len(self.f)):
             self.F[b] = self.Dff * self.f[b - 1] + self.Dfg * self.g[b - 1] + self.f[b]
             self.G[b] = self.Egg * self.g[b - 1] + self.Egf * self.f[b - 1] + self.g[b]
+
     
     def IIR_calculation(self):
-        self.y[0][0] = self.F[0]
-        self.y[0][1] = self.G[0]
-        
-        self.y[1][0] = self.F[1]
-        self.y[1][1] = self.G[1]
-        
-        for b in range(2, len(self.clocks)):
-            self.y[b][0] = self.C0 * self.y[b - 2][0] + self.C1 * self.y[b - 2][1] + self.F[b]
-            self.y[b][1] = self.C2 * self.y[b - 2][0] + self.C3 * self.y[b - 2][1] + self.G[b]
+        for b in range(len(self.clocks)):
+            self.y[b][0] = (self.C0 * self.y[b - 2][0]) + (self.C1 * self.y[b - 2][1]) + self.F[b]
+            self.y[b][1] = (self.C2 * self.y[b - 2][0]) + (self.C3 * self.y[b - 2][1]) + self.G[b]
 
     def implementation(self):
         for b, clock in enumerate(self.y):
@@ -279,34 +258,63 @@ class SimBiquad():
     def FIR(self):
         self.single_zero_fir()
 
-        # self.set_u()
         self.first_constants()
         self.second_constants()
     
     def IIR(self):
         self.FIR()
         self.IIR_calculation()
-        self.implementation()
-        # self.single_zero_fir2()
+        # self.implementation()
+
+
+    def get_Xns(self):
+        return self.Xn
+        
+    def get_crosslink(self):
+        return [self.Dff, self.Egg, self.Dfg, self.Egf]
+
+    def get_poleCoef(self):
+        return [self.C0, self.C1, self.C2, self.C3]
+
+    def get_incremental(self):
+        return [self.a1, self.a2]
+    
+    def get_zero(self):
+        return [self.A, self.B]
+
+    def get_coeffs(self):
+        return self.get_Xns(), self.get_crosslink(), self.get_poleCoef(), self.get_incremental(), self.get_zero()
+    
+    def printCoeffs(self):
+        print(f"X1 : {self.Xn[1]}\nX2 : {self.Xn[2]}\nX3 : {self.Xn[3]}\nX4 : {self.Xn[4]}\nX5 : {self.Xn[5]}\nX6 : {self.Xn[6]}\nX7 : {self.Xn[7]}\n")
+
+        print(f"\nDff : {self.Dff}\nEgg : {self.Egg}\nDfg : {self.Dfg}\nEgf : {self.Egf}\n")
+
+        print(f"\nC0 : {self.C0}\nC1 : {self.C1}\nC2 : {self.C2}\nC3 : {self.C3}\n")
+
+        print(f"\na1 : {self.a1}\na2 : {self.a2}")
         
         
     def get_fir(self):
         return np.array([item for sublist in self.u for item in sublist])
 
+    ##This gets the output of single_zero_fir
     def get_u(self):
         result = np.zeros_like(self.y)
         for b in range(self.length):
-            result[b, 0] = np.floor(self.calc_12_bit(self.u[b,0]))
-            result[b, 1] = np.floor(self.calc_12_bit(self.u[b,1]))
+            result[b, 0] = self.u[b,0]
+            result[b, 1] = self.u[b,1]
         return result.flatten()
     
+    ##This gets the output of f and g
     def get_decimated1(self):
         result = np.zeros_like(self.y)
         for b in range(self.length):
-            result[b, 0] = self.calc_12_bit(np.floor(self.f[b]))
-            result[b, 1] = self.calc_12_bit(np.floor(self.g[b]))
+            result[b, 0] = np.floor(self.calc_12_bit(np.floor(self.f[b])))
+            result[b, 1] = np.floor(self.calc_12_bit(np.floor(self.g[b])))
         return result.flatten()
     
+    ##This gets the output of F and G
     def get_decimated2(self):
         result = np.zeros_like(self.y)
         for b in range(self.length):
@@ -317,14 +325,15 @@ class SimBiquad():
     def get_biquad(self):
         return np.array([int(item) for sublist in self.y for item in sublist])
     
+    ##This gets the output of the IIR before the incremental implementation
     def get_decimated(self):
         result = np.zeros_like(self.y)
         for b in range(self.length):
-            result[b, 0] = np.floor(self.calc_12_bit(self.y[b, 0]))  # First output of the clock period
-            result[b, 1] = np.floor(self.calc_12_bit(self.y[b, 1]))  # Last output of the clock period
+            result[b, 0] = np.floor(self.calc_12_bit(self.y[b, 0]))
+            result[b, 1] = np.floor(self.calc_12_bit(self.y[b, 1])) 
         return result.flatten()
     
-    
+##I can't remember if this still works.
 if __name__ == '__main__':
     P = 0.001
     theta = np.pi
