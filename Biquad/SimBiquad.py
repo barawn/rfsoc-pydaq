@@ -164,10 +164,10 @@ class SimBiquad():
         return processed_nested_values
 
     ##Converts to output bit width
-    def calc_12_bit(self, value):
+    def calc_n_bit(self, value, n):
         # Define the range limits
-        min_val = -2048
-        max_val = 2048
+        min_val = -2**(n-1)
+        max_val = 2**(n-1)
         
         # Calculate the range width
         range_width = max_val - min_val
@@ -177,10 +177,10 @@ class SimBiquad():
         
         return wrapped_value
 
-    def calc_12_bit_array(self, array):
+    def calc_n_bit_array(self, array, n):
         # Define the range limits
-        min_val = -2048
-        max_val = 2048
+        min_val = -2**(n-1)
+        max_val = 2**(n-1)
         
         # Calculate the range width
         range_width = max_val - min_val
@@ -218,9 +218,9 @@ class SimBiquad():
     def single_zero_fir(self):
         for b, clock in enumerate(self.clocks):
             for n, sample in enumerate(clock):
-                self.u[b][n] = self.clip_to_30_bits(self.A * self.data[self.M*b+n] + self.B * self.data[self.M*b+n-1] + self.A * self.data[self.M*b+n-2])
+                self.u[b][n] = self.A * self.data[self.M*b+n] + self.B * self.data[self.M*b+n-1] + self.A * self.data[self.M*b+n-2]
 
-        self.u = np.floor(self.calc_12_bit_array(self.u))
+        self.u = np.floor(self.calc_n_bit_array(self.u, 12))
 
     def first_constants(self):
         for b, clock in enumerate(self.u):
@@ -240,12 +240,18 @@ class SimBiquad():
             self.g[b] += self.Xn[self.M - 1] * self.u[b - 1][2]
                     
     def second_constants(self):
+        # self.f = self.calc_n_bit_array(self.f, 11)
+        # self.g = self.calc_n_bit_array(self.g, 11)
+        
         for b in range(0, len(self.f)):
             self.F[b] = self.Dff * self.f[b - 1] + self.Dfg * self.g[b - 1] + self.f[b]
             self.G[b] = self.Egg * self.g[b - 1] + self.Egf * self.f[b - 1] + self.g[b]
 
     
     def IIR_calculation(self):
+        self.F = self.calc_n_bit_array(self.F, 11)
+        self.G = self.calc_n_bit_array(self.G, 11)
+
         for b in range(len(self.clocks)):
             self.y[b][0] = (self.C0 * self.y[b - 2][0]) + (self.C1 * self.y[b - 2][1]) + self.F[b]
             self.y[b][1] = (self.C2 * self.y[b - 2][0]) + (self.C3 * self.y[b - 2][1]) + self.G[b]
@@ -310,16 +316,16 @@ class SimBiquad():
     def get_decimated1(self):
         result = np.zeros_like(self.y)
         for b in range(self.length):
-            result[b, 0] = np.floor(self.calc_12_bit(np.floor(self.f[b])))
-            result[b, 1] = np.floor(self.calc_12_bit(np.floor(self.g[b])))
+            result[b, 0] = np.floor(self.calc_n_bit(np.floor(self.f[b]), 12))
+            result[b, 1] = np.floor(self.calc_n_bit(np.floor(self.g[b]), 12))
         return result.flatten()
     
     ##This gets the output of F and G
     def get_decimated2(self):
         result = np.zeros_like(self.y)
         for b in range(self.length):
-            result[b, 0] = np.floor(self.calc_12_bit(self.F[b]))
-            result[b, 1] = np.floor(self.calc_12_bit(self.G[b]))
+            result[b, 0] = np.floor(self.calc_n_bit(self.F[b], 12))
+            result[b, 1] = np.floor(self.calc_n_bit(self.G[b], 12))
         return result.flatten()
         
     def get_biquad(self):
@@ -329,8 +335,23 @@ class SimBiquad():
     def get_decimated(self):
         result = np.zeros_like(self.y)
         for b in range(self.length):
-            result[b, 0] = np.floor(self.calc_12_bit(self.y[b, 0]))
-            result[b, 1] = np.floor(self.calc_12_bit(self.y[b, 1])) 
+            result[b, 0] = np.floor(self.calc_n_bit(self.y[b, 0], 12))
+            result[b, 1] = np.floor(self.calc_n_bit(self.y[b, 1], 12)) 
+        return result.flatten()
+    
+
+    def get_f_g(self):
+        result = np.zeros_like(self.y)
+        for b in range(self.length):
+            result[b, 0] = self.f[b]
+            result[b, 1] = self.g[b]
+        return result.flatten()
+
+    def get_F_G(self):
+        result = np.zeros_like(self.y)
+        for b in range(self.length):
+            result[b, 0] = self.F[b]
+            result[b, 1] = self.G[b]
         return result.flatten()
     
 ##I can't remember if this still works.

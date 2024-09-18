@@ -25,6 +25,14 @@ class Filterred(Waveform):
         self.periodogram = None
         self.periodogram_freq = None
     
+    def setRMS(self):
+        if self.decimated_WF is None:
+            self.convert_Decimated()
+
+        square_sum = sum(x ** 2 for x in self.decimated_WF)
+        mean_square = square_sum / len(self.decimated_WF)
+        self.RMS = np.sqrt(mean_square)
+
     def convert_Decimated(self, start=0, end=7):
         if self.clocks is None:
             self.setClocks()
@@ -73,8 +81,9 @@ class Filterred(Waveform):
 
         self.setWaveFFT()
         self.setPeaktoPeak()
+        self.setRMS()
 
-        stats_text = f"Peak-Peak : {self.peakToPeak:.2f} ADC\nFrequency : {self.frequencyFFT*10**(-6):.2f} MHz"
+        stats_text = f"Peak-Peak : {self.peakToPeak:.2f} ADC\nRMS : {self.RMS:.2f} ADC\nFrequency : {self.frequencyFFT*10**(-6):.2f} MHz"
         
         ax.text(0.97, 0.97, stats_text, verticalalignment='top', horizontalalignment='right',
             transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.5))
