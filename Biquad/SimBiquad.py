@@ -10,7 +10,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Waveforms.Filterred import Filterred
 
 class SimBiquad():
-    def __init__(self, data, A=0, B=1, P=0, theta=np.pi, M=8):
+    def __init__(self, data, A=0, B=1, P=0, theta=np.pi, M=8, amp = 1):
 
         ##Setting the parameters from initialisation
         self.A = A
@@ -18,6 +18,10 @@ class SimBiquad():
         self.P = P
         self.theta = theta
         self.M = M
+
+        ##This is the rms of the original gated input. Necessary for controlling the gain. (P2P not great for the decimated filterred waveform)
+        self.amp = amp
+
         self.length = int(len(data)/8)
         
         self.data = data
@@ -55,6 +59,12 @@ class SimBiquad():
         self.set_Cs()
         self.set_As()
 
+####################
+## Set Parameter methods
+#################### 
+    ##The original RMS of the waveform
+    def setAmplitude(self,amp):
+        self.amp = amp
 
     def setA(self, A):
         self.A = A
@@ -93,6 +103,10 @@ class SimBiquad():
         self.g = np.zeros(self.length)
         self.F = np.zeros(self.length)
         self.G = np.zeros(self.length)
+
+####################
+## Set Coefficients
+#################### 
     
     def set_Xn(self):
         for n in range(self.M):
@@ -129,6 +143,10 @@ class SimBiquad():
         self.a1 = 2 * self.P * np.cos(self.theta)
         self.a2 = self.P**2
     
+####################
+## Set Batch Coefficients
+#################### 
+
     def set_Cross(self):
         self.set_Dff()
         self.set_Egg()
@@ -141,28 +159,10 @@ class SimBiquad():
         self.set_C2()
         self.set_C3()
 
-    ##This is currently redundant since the daq provides values in 4bit_signed
-    def to_4bit_signed(self, nested_values, scale_factor=16384):
-        processed_nested_values = []
-        
-        for sublist in nested_values:
-            processed_sublist = []
-            for value in sublist:
-                # Scale and round the value
-                scaled_value = np.round(value * scale_factor)
-                
-                # Handle wrapping for values outside the 4-bit signed integer range [-8, 7]
-                wrapped_scaled_value = ((scaled_value + (8 * scale_factor)) % (16 * scale_factor)) - (8 * scale_factor)
-                
-                # Convert back to floating-point representation
-                fixed_point_value = wrapped_scaled_value / scale_factor
-                
-                processed_sublist.append(fixed_point_value)
-            
-            processed_nested_values.append(processed_sublist)
-        
-        return processed_nested_values
-
+####################
+## Miscleneous methods
+####################     
+    
     ##Converts to output bit width
     def calc_n_bit(self, value, n):
         # Define the range limits
@@ -192,7 +192,6 @@ class SimBiquad():
 
     ##Input should be daq calculated Coefficients (divided by 2^14) so the sim has the exact same values as the daq
     def set_daq_coeffs(self, params):
-        # params = self.to_4bit_signed(params)
         self.Xn = params[0]
 
         self.Dff = params[1][0]
@@ -214,6 +213,10 @@ class SimBiquad():
             self.B = params[4][1]
         except:
             pass
+
+####################
+## Calculate Results Results
+####################    
 
     def single_zero_fir(self):
         for b, clock in enumerate(self.clocks):
@@ -239,10 +242,7 @@ class SimBiquad():
             
             self.g[b] += self.Xn[self.M - 1] * self.u[b - 1][2]
                     
-    def second_constants(self):
-        # self.f = self.calc_n_bit_array(self.f, 11)
-        # self.g = self.calc_n_bit_array(self.g, 11)
-        
+    def second_constants(self):        
         for b in range(0, len(self.f)):
             self.F[b] = self.Dff * self.f[b - 1] + self.Dfg * self.g[b - 1] + self.f[b]
             self.G[b] = self.Egg * self.g[b - 1] + self.Egf * self.f[b - 1] + self.g[b]
@@ -261,6 +261,10 @@ class SimBiquad():
             for i in range(2, self.M):
                 self.y[b][i] = -self.a1 * self.y[b][i - 1] - self.a2 * self.y[b][i - 2] + self.u[b][i]
     
+####################
+## Run Batch
+####################    
+
     def FIR(self):
         self.single_zero_fir()
 
@@ -272,6 +276,9 @@ class SimBiquad():
         self.IIR_calculation()
         # self.implementation()
 
+####################
+## Get Details
+####################
 
     def get_Xns(self):
         return self.Xn
@@ -299,10 +306,13 @@ class SimBiquad():
         print(f"\nC0 : {self.C0}\nC1 : {self.C1}\nC2 : {self.C2}\nC3 : {self.C3}\n")
 
         print(f"\na1 : {self.a1}\na2 : {self.a2}")
-        
-        
-    def get_fir(self):
-        return np.array([item for sublist in self.u for item in sublist])
+
+####################
+## Get Results
+####################        
+ 
+    def get_single_zero_fir(self):
+        return Filterred(np.array([item for sublist in self.u for item in sublist]), self.A, self.B, self.P, self.theta)
 
     ##This gets the output of single_zero_fir
     def get_u(self):
@@ -310,7 +320,7 @@ class SimBiquad():
         for b in range(self.length):
             result[b, 0] = self.u[b,0]
             result[b, 1] = self.u[b,1]
-        return result.flatten()
+        return Filterred(result.flatten(), self.A, self.B, self.P, self.theta)
     
     ##This gets the output of f and g
     def get_decimated1(self):
@@ -318,7 +328,7 @@ class SimBiquad():
         for b in range(self.length):
             result[b, 0] = np.floor(self.calc_n_bit(np.floor(self.f[b]), 12))
             result[b, 1] = np.floor(self.calc_n_bit(np.floor(self.g[b]), 12))
-        return result.flatten()
+        return  Filterred(result.flatten(), self.A, self.B, self.P, self.theta)
     
     ##This gets the output of F and G
     def get_decimated2(self):
@@ -326,10 +336,10 @@ class SimBiquad():
         for b in range(self.length):
             result[b, 0] = np.floor(self.calc_n_bit(self.F[b], 12))
             result[b, 1] = np.floor(self.calc_n_bit(self.G[b], 12))
-        return result.flatten()
+        return Filterred(result.flatten(), self.A, self.B, self.P, self.theta)
         
     def get_biquad(self):
-        return np.array([int(item) for sublist in self.y for item in sublist])
+        return Filterred(np.array([int(item) for sublist in self.y for item in sublist]), self.A, self.B, self.P, self.theta)
     
     ##This gets the output of the IIR before the incremental implementation
     def get_decimated(self):
@@ -337,7 +347,7 @@ class SimBiquad():
         for b in range(self.length):
             result[b, 0] = np.floor(self.calc_n_bit(self.y[b, 0], 12))
             result[b, 1] = np.floor(self.calc_n_bit(self.y[b, 1], 12)) 
-        return result.flatten()
+        return Filterred(np.array(result.flatten()), self.A, self.B, self.P, self.theta)
     
 
     def get_f_g(self):
@@ -345,14 +355,14 @@ class SimBiquad():
         for b in range(self.length):
             result[b, 0] = self.f[b]
             result[b, 1] = self.g[b]
-        return result.flatten()
+        return Filterred(result.flatten(), self.A, self.B, self.P, self.theta)
 
     def get_F_G(self):
         result = np.zeros_like(self.y)
         for b in range(self.length):
             result[b, 0] = self.F[b]
             result[b, 1] = self.G[b]
-        return result.flatten()
+        return Filterred(result.flatten(), self.A, self.B, self.P, self.theta)
     
 ##I can't remember if this still works.
 if __name__ == '__main__':

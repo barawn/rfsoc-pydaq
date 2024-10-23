@@ -11,12 +11,22 @@ class Filterred(Waveform):
     ##Was 400->920
     ##Now 424->952
     ##Do additional multiple clocks for testing
-    def __init__(self, waveform: List, start=424, end=8*200, sampleRate = 3.E9):
+
+    ##Maybe we have it automatically pick a start and end
+    ##Like do shorten wavelength when it finds first clock to when the clock goes to zero
+    
+    def __init__(self, waveform: List, A=0, B=1, P=0, theta=0.01, amp=1, sampleRate = 3.E9):
         ## start=280, end=800 for Simulation biquad
         super().__init__(waveform, sampleRate = 3.E9)
+
+        self.A = A
+        self.B = B
+        self.P = P
+        self.theta = theta
+        self.amp = amp
         
-        self.shortenWaveform(start, end)
         self.setClocks()
+        self.set_waveform_range()
 
         self.decimated_WF = None
         self.decimated_TL = None
@@ -24,6 +34,94 @@ class Filterred(Waveform):
         self.periodogram_freqs = None
         self.periodogram = None
         self.periodogram_freq = None
+
+    ##Gated waveform starts ~35 clocks in. The Daq biquad starts I can't remember but setting this is very annoying
+
+#########################
+## Automatic gating
+#########################
+    def find_first_clock(self):
+        first_clock=0
+        for clock in self.clocks:
+            if clock[0] == 0 and clock[1] == 0:
+                first_clock+=1
+            else:
+                break
+        return first_clock
+    
+    def find_last_clock(self, start):
+        last_clock=start
+        for i in range(start, len(self.clocks)):
+            if self.clocks[i][0] == 0 and self.clocks[i][1] == 0:
+                break
+            else:
+                last_clock+=1
+        return last_clock
+    
+    def set_waveform_range(self):
+        first_clock = self.find_first_clock()
+        last_clock = self.find_last_clock(first_clock)
+        self.shortenWaveform(first_clock*8, last_clock*8)
+        self.setClocks()
+
+#########################
+## Calculations
+#########################
+
+###########
+## Single_Zero_fir
+###########
+
+    def calc_Lambda(self):
+        return 2*self.A*np.cos(self.omega) + self.B
+    
+    def calc_B_destruction(self):
+        return -2*self.A*np.cos(self.omega)
+    
+###########
+## Pole fir
+###########
+    def mu_i(self, i):
+        return self.P**(i-1) * np.sin(i*self.theta)
+
+######
+## f
+######
+    def D_f(self):
+        D_f = 0
+        for i in range(1,8):
+            D_f += self.mu_i(i) * np.cos(self.omega*i)
+        return D_f
+    
+    def E_f(self):
+        E_f = 0
+        for i in range(1,8):
+            E_f += self.mu_i(i) * np.sin(self.omega*i)
+        return E_f
+
+    def R_f(self):
+        return np.sqrt(self.D_f()**2 + self.E_f()**2)
+######
+## g
+######
+    def D_g(self):
+        D_g = 0
+        for i in range(1,9):
+            D_g += self.mu_i(i) * np.cos(self.omega*i)
+        return D_g
+    
+    def E_g(self):
+        E_g = 0
+        for i in range(1,9):
+            E_g += self.mu_i(i) * np.sin(self.omega*i)
+        return E_g
+
+    def R_g(self):
+        return np.sqrt(self.D_g()**2 + self.E_g()**2)
+    
+    def Average_R_fg(self):
+        return (abs(self.R_f())+abs(self.R_g()))/2
+
     
     def setRMS(self):
         if self.decimated_WF is None:
@@ -33,6 +131,10 @@ class Filterred(Waveform):
         mean_square = square_sum / len(self.decimated_WF)
         self.RMS = np.sqrt(mean_square)
 
+#########################
+## Miscleneuous
+#########################
+    ##Just in case you got the full waveform
     def convert_Decimated(self, start=0, end=7):
         if self.clocks is None:
             self.setClocks()
@@ -50,6 +152,7 @@ class Filterred(Waveform):
         self.decimated_WF = self.decimated_WF.flatten()
         self.decimated_TL = self.decimated_TL.flatten()
 
+    ##This is redundant, and if I recall never worked
     def Lomb_Scargle(self):
         self.convert_Decimated()
 
@@ -64,6 +167,10 @@ class Filterred(Waveform):
         self.periodogram_freq = self.periodogram.argmax()
         print(self.periodogram_freq)
 
+
+#########################
+## Plots
+#########################
 
     def plotWaveform(self, ax: plt.Axes=None, title = None, figsize=(25, 15)):
         if ax is None:

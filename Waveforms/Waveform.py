@@ -31,6 +31,8 @@ class Waveform():
         self.frequencyFFT = None
         self.amplitudeFFT = None
         self.phaseFFT = None
+
+        self.omega = None
         
         ##Amplitude Stuff
         self.peakToPeak = None
@@ -42,11 +44,12 @@ class Waveform():
     ## Clock formatting stuff
     #####
 
-    ## This method has subsequently become redundant
-    def removeFirstClock(self):
-        self.waveform = self.waveform[8:]
-        self.clocks = self.clocks[1:]
-        self.clockTime = self.clockTime[1:]
+    ##Testing reason, first clock sometimes wildly different to rest and messes with the rms prediction
+    ##Clock pos for sim is 35
+    def removeFirstClock(self, clock_pos):
+        self.waveform = self.waveform[8*clock_pos:]
+        self.clocks = self.clocks[clock_pos:]
+        self.clockTime = self.clockTime[clock_pos:]
 
     def shortenWaveform(self, start, end):
         self.waveform = self.waveform[start:end]
@@ -80,6 +83,8 @@ class Waveform():
         self.frequencyFFT = self.xf[self.peak_freq_index]
         self.amplitudeFFT = self.mag_spectrum[self.peak_freq_index]
         self.phaseFFT = self.phase_spectrum[self.peak_phase_index] 
+
+        self.omega = 2*np.pi * self.frequencyFFT/self.sampleRate
         
     def doFFTs(self):
         self.setWaveFFT()

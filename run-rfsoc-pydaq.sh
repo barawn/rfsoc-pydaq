@@ -9,4 +9,4 @@
 #Assuming this is where pydaq is stored, allows running from anywhere
 CURDIR=/home/xilinx/rfsoc-pydaq # `pwd`
 sudo xauth add $(xauth -f ~xilinx/.Xauthority list|tail -1)
-sudo -i DISPLAY=$DISPLAY python3 $CURDIR/app.py -c "biquad"
+sudo -i DISPLAY=$DISPLAY python3 $CURDIR/app.py ## -c "agc_test"
