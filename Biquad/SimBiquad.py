@@ -339,7 +339,8 @@ class SimBiquad():
         return Filterred(result.flatten(), self.A, self.B, self.P, self.theta)
         
     def get_biquad(self):
-        return Filterred(np.array([int(item) for sublist in self.y for item in sublist]), self.A, self.B, self.P, self.theta)
+        # return Filterred(np.array([int(item) for sublist in self.y for item in sublist]), self.A, self.B, self.P, self.theta)
+        return Filterred(np.array(np.floor(self.calc_n_bit_array(self.y, 12)).flatten()), self.A, self.B, self.P, self.theta)
     
     ##This gets the output of the IIR before the incremental implementation
     def get_decimated(self):
@@ -381,7 +382,7 @@ if __name__ == '__main__':
 
     # data = sine_wave.reshape(num_clocks, M)
     
-    biquad = Biquad(data=sine_wave, A=A, B=B, P=P, theta=theta, M=M)
+    biquad = SimBiquad(data=sine_wave, A=A, B=B, P=P, theta=theta, M=M)
     
     biquad.IIR()
     # output = biquad.get_fir()

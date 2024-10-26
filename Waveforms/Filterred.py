@@ -60,7 +60,8 @@ class Filterred(Waveform):
     
     def set_waveform_range(self):
         first_clock = self.find_first_clock()
-        last_clock = self.find_last_clock(first_clock)
+        last_clock = first_clock+64 ##This will ignore any only iir part
+        # last_clock = self.find_last_clock(first_clock)
         self.shortenWaveform(first_clock*8, last_clock*8)
         self.setClocks()
 
