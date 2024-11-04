@@ -66,6 +66,7 @@ class Waveform():
     
     def setFreqFFT(self):
         self.fft_result = fft(self.waveform)
+        return self.fft_result
     
     def setFFTSpectrum(self):
         self.setFreqFFT()

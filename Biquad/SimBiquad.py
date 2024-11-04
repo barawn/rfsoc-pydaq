@@ -7,10 +7,10 @@ import os
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from Waveforms.Filterred import Filterred
+from Waveforms.Filterred import Filterred, Waveform
 
 class SimBiquad():
-    def __init__(self, data, A=0, B=1, P=0, theta=np.pi, M=8, amp = 1):
+    def __init__(self, data, A=0, B=1, P=0, theta=np.pi, M=8):
 
         ##Setting the parameters from initialisation
         self.A = A
@@ -19,8 +19,8 @@ class SimBiquad():
         self.theta = theta
         self.M = M
 
-        ##This is the rms of the original gated input. Necessary for controlling the gain. (P2P not great for the decimated filterred waveform)
-        self.amp = amp
+        ##This is the rms of the original gated input. Necessary for controlling the gain. (P2P not great for the decimated Waveform waveform)
+        # self.amp = amp
 
         self.length = int(len(data)/8)
         
@@ -63,9 +63,6 @@ class SimBiquad():
 ## Set Parameter methods
 #################### 
     ##The original RMS of the waveform
-    def setAmplitude(self,amp):
-        self.amp = amp
-
     def setA(self, A):
         self.A = A
     
@@ -256,10 +253,10 @@ class SimBiquad():
             self.y[b][0] = (self.C0 * self.y[b - 2][0]) + (self.C1 * self.y[b - 2][1]) + self.F[b]
             self.y[b][1] = (self.C2 * self.y[b - 2][0]) + (self.C3 * self.y[b - 2][1]) + self.G[b]
 
-    def implementation(self):
+    def incremental(self):
         for b, clock in enumerate(self.y):
             for i in range(2, self.M):
-                self.y[b][i] = -self.a1 * self.y[b][i - 1] - self.a2 * self.y[b][i - 2] + self.u[b][i]
+                self.y[b][i] = self.a1 * self.y[b][i - 1] - self.a2 * self.y[b][i - 2] + self.u[b][i]
     
 ####################
 ## Run Batch
@@ -274,8 +271,11 @@ class SimBiquad():
     def IIR(self):
         self.FIR()
         self.IIR_calculation()
-        # self.implementation()
+        # self.incremental()
 
+    def whole(self):
+        self.IIR()
+        self.incremental()
 ####################
 ## Get Details
 ####################
@@ -312,7 +312,7 @@ class SimBiquad():
 ####################        
  
     def get_single_zero_fir(self):
-        return Filterred(np.array([item for sublist in self.u for item in sublist]), self.A, self.B, self.P, self.theta)
+        return Filterred(np.array([item for sublist in self.u for item in sublist]))
 
     ##This gets the output of single_zero_fir
     def get_u(self):
@@ -339,7 +339,7 @@ class SimBiquad():
         return Filterred(result.flatten(), self.A, self.B, self.P, self.theta)
         
     def get_biquad(self):
-        # return Filterred(np.array([int(item) for sublist in self.y for item in sublist]), self.A, self.B, self.P, self.theta)
+        # return Filterred(np.array([int(item) for sublist in self.y for item in sublist]))
         return Filterred(np.array(np.floor(self.calc_n_bit_array(self.y, 12)).flatten()), self.A, self.B, self.P, self.theta)
     
     ##This gets the output of the IIR before the incremental implementation
@@ -365,53 +365,74 @@ class SimBiquad():
             result[b, 1] = self.G[b]
         return Filterred(result.flatten(), self.A, self.B, self.P, self.theta)
     
+
+########################
+## Additional stuff
+########################
+
+    def filter_frequency(self, freq):
+        self.setB(-2*self.A*np.cos(2*np.pi*freq/3E9))
+
+    def S12(self, iterations=100, clocks=64):
+        sample_rate = 3e9
+        dt = 1/sample_rate
+        duration = 8*clocks * dt
+        t = np.arange(0, duration, dt)
+
+        S21_arr = []
+        for i in range(100):
+            noise = np.random.normal(0, 20, len(t))
+            self.setData(data=noise)
+            # self.IIR()
+            self.whole()
+
+            raw = Waveform(noise)
+            filter = self.get_biquad()
+
+            filter.setFreqFFT()
+            raw.setFreqFFT()
+
+            S21 = filter.fft_result/raw.fft_result
+
+            S21_arr.append(S21)
+
+        S21_mean = [sum(x) / len(S21_arr) for x in zip(*S21_arr)]
+        return 20 * np.log10(np.abs(S21_mean[:len(self.data)//2]))
+
+
+
+    
 ##I can't remember if this still works.
 if __name__ == '__main__':
-    P = 0.001
-    theta = np.pi
     M = 8
-    num_clocks = 64
-    A = 20
-    B = 20
+    num_clocks = 1000
+
+    A = 3.4
+    B = -7.2
+    P = 0.93
+    theta = 8/16
     
     sample_rate = 3e9  # 3 GS/s
     frequency = 400e6  # 400 MHz
     
     t = np.arange(num_clocks * M) / sample_rate  # Time vector
-    sine_wave = np.sin(2 * np.pi * frequency * t)
+    sine_wave = 20*np.sin(2 * np.pi * frequency * t)
 
     # data = sine_wave.reshape(num_clocks, M)
     
-    biquad = SimBiquad(data=sine_wave, A=A, B=B, P=P, theta=theta, M=M)
+    biquad = SimBiquad(data=sine_wave, A=A, B=B, P=P, theta=np.pi*theta, M=M)
     
-    biquad.IIR()
-    # output = biquad.get_fir()
-    # output = biquad.get_decimated1()
-    # output = biquad.get_decimated2()
+    biquad.whole()
     output = biquad.get_biquad()
 
-    output_flat = np.array(output).flatten()
+    other = Filterred(sine_wave)
 
-    plt.figure(figsize=(14, 7))
-    
-    plt.subplot(3, 1, 1)
-    plt.plot(t, sine_wave)
-    plt.title('Input Sine Wave')
-    plt.xlabel('Time [s]')
-    plt.ylabel('Amplitude')
+    fig, ax = plt.subplots(figsize=(14,7))
 
-    plt.subplot(3, 1, 2)
-    plt.plot(t[:len(output_flat)], output_flat)
-    plt.title('Output of Biquad Filter')
-    plt.xlabel('Time [s]')
-    plt.ylabel('Amplitude')
-    
-    plt.subplot(3, 1, 3)
-    plt.plot(t[:len(output_flat)], output_flat)
-    plt.plot(t, sine_wave)
-    plt.title('On top each other')
-    plt.xlabel('Time [s]')
-    plt.ylabel('Amplitude')
 
-    plt.tight_layout()
+    output.plotFFT(ax)
+    other.plotFFT(ax)
+    # ax.plot(np.arange(len(t)) / 8, sine_wave, label='Raw Sine')
+
+    plt.legend()
     plt.show()
