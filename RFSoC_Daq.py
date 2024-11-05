@@ -2,14 +2,10 @@
 import numpy as np
 import tkinter as tk
 from tkinter import filedialog
-from scipy.fft import fft, ifft, fftfreq
-from scipy.constants import speed_of_light
-from typing import Callable
 
 #System Imports
 import logging
-import subprocess
-import os, sys, inspect, importlib, configparser, csv
+import os, sys, inspect, importlib
 
 #Module Imports
 from waveframe.Waveframe import Waveframe
@@ -348,4 +344,4 @@ class RFSoC_Daq:
 
 
 if __name__ == '__main__':
-    pass
+    print(type(RFSoC_Daq))
