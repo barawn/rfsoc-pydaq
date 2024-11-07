@@ -149,8 +149,6 @@ class Waveform():
 
         ## For the basic plot not sure what else one might want
 
-        ax.axhline(y=0, color='black', linewidth=0.4, label='Zero Line')
-
         stats_text = f"P2P : {self.peakToPeak:.2f}\nRMS : {self.RMS:.2f} ADC\nFrequency : {self.frequencyFFT*10**(-6):.2f} MHz"
         
         ax.text(0.97, 0.97, stats_text, verticalalignment='top', horizontalalignment='right',
