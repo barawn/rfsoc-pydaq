@@ -18,10 +18,20 @@ class Oscilloscope_Display(FigureCanvasTkAgg):
         self.figure = Figure(figsize=(width, height))
         self.parent = parent
         super().__init__(self.figure, self.parent)
+
+        self.figure.subplots_adjust(left=0.04, right=0.97, top=0.9, bottom=0.1)
         
         self.ax = self.figure.add_subplot(111)
-        self.ax.grid(True)
-    
+        self.figure.patch.set_facecolor('black')
+        self.ax.set_facecolor('black')
+        self.ax.grid(True, color='white')
+
+        self.ax.tick_params(axis='both', colors='white')
+
+        for spine in self.ax.spines.values():
+            spine.set_color('white')  # Set spine color to white
+            spine.set_linewidth(2)  
+
     def ungrid(self):
         if self.get_tk_widget().winfo_ismapped():
             self.get_tk_widget().grid_forget()
@@ -30,35 +40,30 @@ class Oscilloscope_Display(FigureCanvasTkAgg):
         if waveforms != None:
             self.waveforms = waveforms
 
-        print(len(self.waveforms))
-
         self.ax.clear()
         self.ax.grid(True)
 
         for i, trace in enumerate(self.waveforms):
             if trace != None:
                 if self.parent.settings_frame.arr_plot[i] == True:
-                    trace.plotWaveform(ax = self.ax)
+                    trace.plotWaveform(ax = self.ax, colour = self.parent.colours[i], scale = self.parent.settings_frame.arr_scale[i], offset = self.parent.settings_frame.arr_offset[i], pos=0.18*i)
 
-        self.ax.set_title("Channel Traces")
-        self.ax.set_xlabel('Time (ns)')
-        self.ax.set_ylabel('ADC Counts')
+        self.ax.set_title("Channel Traces", color='white')
+        self.ax.set_xlabel('Time (ns)', color='white')
+        self.ax.set_ylabel('ADC Counts', color='white')
 
-        self.ax.legend()
+        self.ax.legend(loc="lower right")
         self.draw()
 
     def plot_fft(self, spectra : list[Waveform] = None):
         if spectra != None:
-            print('setting spectra')
             self.waveforms = spectra
 
         if all(not item for item in self.parent.settings_frame.arr_fft) == True:
-            print('Not Plotting FFT')
             self.parent.update_layout(True, False)
             return
 
         if not self.waveforms:
-            print('No FFT to plot')
             self.parent.update_layout(True, False)
             return
         
@@ -66,17 +71,16 @@ class Oscilloscope_Display(FigureCanvasTkAgg):
         self.ax.grid(True)
 
         if self.get_tk_widget().winfo_ismapped() != True:
-            print("Displaying FFT plot")
             self.parent.update_layout(True, True)
 
         for i, spectrum in enumerate(self.waveforms):
             if spectrum != None:
                 if self.parent.settings_frame.arr_fft[i] == True:
-                    spectrum.plotFFT(ax = self.ax)
+                    spectrum.plotFFT(ax = self.ax, colour = self.parent.colours[i])
 
-        self.ax.set_title("Channel Spectra")
-        self.ax.set_xlabel('Frequency (MHz)')
-        self.ax.set_ylabel('Magnitude (arb.)')
+        self.ax.set_title("Channel Spectra", color='white')
+        self.ax.set_xlabel('Frequency (MHz)', color='white')
+        self.ax.set_ylabel('Magnitude (arb.)', color='white')
         
         self.ax.legend()
         self.draw()

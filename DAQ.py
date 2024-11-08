@@ -13,7 +13,7 @@ from waveframe.Waveframes import Waveframes
 
 from Waveforms.Waveform import Waveform
 
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
 
 #FPGA Class
 class RFSoC_Daq:
@@ -29,6 +29,8 @@ class RFSoC_Daq:
         self._waveforms = None
 
         self.dev = None
+
+        self.logger = logging.getLogger(__name__)
 
     ###########################################
     ##### Field setters
@@ -103,17 +105,17 @@ class RFSoC_Daq:
                                             filetypes=[("Python files","*.py"),
                                                         ("All files", "*.*")])
         
-        logger.debug("Asked to load overlay at %s" % file_path)
+        self.logger.debug("Asked to load overlay at %s" % file_path)
         newdir = os.path.dirname(os.path.abspath(file_path))    
 
         curpath = sys.path
-        logger.debug("Adding directory %s to module search path" % newdir)
+        self.logger.debug("Adding directory %s to module search path" % newdir)
         sys.path.insert(1, newdir)    
         curdir = os.path.abspath(os.curdir)
-        logger.debug("Changing directory to %s" % newdir)
+        self.logger.debug("Changing directory to %s" % newdir)
         os.chdir(newdir)
         base, extension = os.path.splitext(os.path.basename(file_path))
-        logger.debug("Going to try to import %s", base)
+        self.logger.debug("Going to try to import %s", base)
             
         # create a custom exception
         class LocalException(Exception):
@@ -133,7 +135,7 @@ class RFSoC_Daq:
             if overlayClass is None:
                 del sys.modules[module.__name__]
                 raise LocalException("Unable to find Overlay class in module %s" % module.__name__)
-            logger.debug("Found Overlay class %s from module %s" % (overlayClass.__name__ , overlayClass.__module__ ))
+            self.logger.debug("Found Overlay class %s from module %s" % (overlayClass.__name__ , overlayClass.__module__ ))
             # Now find the module to call
             theClass = None
             for name, obj in inspect.getmembers(module):
@@ -147,18 +149,18 @@ class RFSoC_Daq:
             if not callable(captureFn):
                 del sys.modules[module.__name__]
                 raise LocalException("The Overlay %s in module %s has no callable internal_capture method" % (theClass.__name__ , module.__name__ ))
-            logger.debug("Found RFSoC overlay %s" % theClass.__name__)
+            self.logger.debug("Found RFSoC overlay %s" % theClass.__name__)
             self.dev = theClass()
-            logger.debug("Created RFSoC device")
+            self.logger.debug("Created RFSoC device")
         except LocalException as e:
-            logger.error(str(e))
+            self.logger.error(str(e))
         except Exception as e:
-            logger.error("Unable to load module %s" % base)
-            logger.error(str(e))
+            self.logger.error("Unable to load module %s" % base)
+            self.logger.error(str(e))
             
-        logger.debug("Restoring original module search path")
+        self.logger.debug("Restoring original module search path")
         sys.path = curpath
-        logger.debug("Going back to original directory %s" % curdir)
+        self.logger.debug("Going back to original directory %s" % curdir)
         os.chdir(curdir)
 
         self.dev.init_adc_memory(self.channel_names, self.sample_size*2)
@@ -168,12 +170,12 @@ class RFSoC_Daq:
             from serialcobsdevice import SerialCOBSDevice       ###Since this comes from the loaded zcuagc overlay it may not be recognised in vscode without the explicit import 
             self.setSDV(SerialCOBSDevice('/dev/ttyPS1', 1000000))
         except:
-            logger.debug("It would appear the overloay you have tried to load doesn't contain SerialCOBSDevice")
+            self.logger.debug("It would appear the overloay you have tried to load doesn't contain SerialCOBSDevice")
         return
 
     def rfsocAcquire(self):
         if self.dev is None:
-            logger.error("No RFSoC device is loaded!")
+            self.logger.error("No RFSoC device is loaded!")
             
         self.dev.internal_capture(self.adcBuffer,
                                     self.channel_num)
@@ -191,16 +193,26 @@ class RFSoC_Daq:
         
 
 if __name__ == "__main__":
-    obj = RFSoC_Daq()
+    daq = RFSoC_Daq()
 
-    obj.channel_names = ["Channel 0", "Channel 1", "Channel 2", None]
-    obj.sample_size = 16
+    ##This was just to test certain properties work properly
+    daq.channel_names = ["Channel 0", "Channel 1", "Channel 2", None]
+    daq.sample_size = 16
 
-    print(obj.adcBuffer.shape)
+    print(daq.adcBuffer.shape)
 
-    obj.sample_size = 32
-    print(obj.adcBuffer.shape)
+    daq.sample_size = 32
+    print(daq.adcBuffer.shape)
 
-    # Change channel names, adcBuffer will update automatically
-    obj.channel_names = ["Channel 1", "Channel 2", None, None]
-    print(obj.adcBuffer.shape)  # Output: (2, 32)
+    daq.channel_names = ["Channel 1", "Channel 2", None, None]
+    print(daq.adcBuffer.shape)
+
+    ##Actual DAQ stuff
+    daq.rfsocLoad(hardware="zcumts")
+    #Should print out some loading stuff
+
+    daq.generate_waveforms()
+    #Should produces some waveform instances from daq internal capture
+
+    print(daq.waveforms[0].waveform[0:10])
+    #Should output array where values aren't all zero    

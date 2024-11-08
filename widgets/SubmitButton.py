@@ -1,7 +1,7 @@
 import tkinter as tk
 from typing import Callable
 
-class submitButton:
+class submitButton(tk.Frame):
     """
     So this is a template for a submit button GUI widget
 
@@ -20,31 +20,31 @@ class submitButton:
                  label_text,
                  placeholder_text,
                  submit_command: Callable,
-                 index: int,
                  Auto=False):
         
         self.parent=parent
 
-        self.frame = tk.Frame(self.parent)
+        super().__init__(self.parent)
         
-        self.label =tk.Label(self.frame, text=label_text)
+        self.label =tk.Label(self, text=label_text)
         self.label.grid(row = 0, column=0)
         
-        vcmd = self.frame.register(self.validate)
+        vcmd = self.register(self.validate)
         
         if Auto:
             self.Auto = Auto
-            self.entry = tk.Entry(self.frame, width=12, validate="key", validatecommand=(vcmd, '%P'))
+            self.entry = tk.Entry(self, width=12, validate="key", validatecommand=(vcmd, '%P'))
         else:
-            self.entry = tk.Entry(self.frame, width=12)
+            self.entry = tk.Entry(self, width=12)
         self.entry.insert(0, placeholder_text)
         self.entry.grid(row = 0, column=1)
         self.entry.bind("<Return>", lambda event: submit_command())
         
-        self.submit_button = tk.Button(self.frame, text="Submit", command=submit_command)
+        self.submit_button = tk.Button(self, text="Submit", command=submit_command)
         self.submit_button.grid(row = 0, column=2)
 
-        self.frame.grid(row=0, column=index)
+    def get_value(self):
+        return self.entry.get()
 
     def validate(self, new_text):
         if not new_text:

@@ -10,17 +10,20 @@ class Oscilloscope_GUI(tk.Frame):
     def __init__(self, root, width, height):
         self.root = root
         super().__init__(self.root)
+
+        self.colours = ['dodgerblue', 'gold', 'red', 'limegreen']
+
+        ##Based on ones monitor setup, you might want to edit this
         self.width, self.height = width, height
 
 
-        self.grid_rowconfigure(0, weight=1)  # Row for trace_display
-        self.grid_rowconfigure(1, weight=0)  # Initially, fft_display is hidden
-        self.grid_columnconfigure(0, weight=1)
+        ##Maybe have Oscilloscope_Display have subplots(2,1)
+        #Then they could share the same waveform instance
 
-        self.trace_display = Oscilloscope_Display(self, width=self.width, height=self.height)
-        self.trace_display.get_tk_widget().grid(row=0, column=0)
+        self.trace_display = Oscilloscope_Display(self, width=0.85*self.width, height=self.height)
+        self.trace_display.get_tk_widget().grid(row=0, column=0, pady=5)
 
-        self.fft_display = Oscilloscope_Display(self, width=self.width, height=self.height)
+        self.fft_display = Oscilloscope_Display(self, width=0.85*self.width, height=self.height)
         # self.fft_display.get_tk_widget().grid(row=1, column=0)
 
         self.settings_frame = Oscilloscope_Settings(self)
@@ -53,7 +56,7 @@ if __name__ == "__main__":
     root = tk.Tk()
     root.title("Oscilloscope")
 
-    GUI = Oscilloscope_GUI(root,20,13)
+    GUI = Oscilloscope_GUI(root,10,8)
     GUI.pack(fill=tk.BOTH, expand=True)
 
     # Example data to plot (replace with FPGA data as needed)

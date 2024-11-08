@@ -6,10 +6,11 @@ from scipy.fft import fft
 from typing import List
 
 class Waveform():
-    def __init__(self, waveform: List, sampleRate = 3.E9):
+    def __init__(self, waveform: np.ndarray, sampleRate = 3.E9, title : str = None):
         self.waveform = waveform
         self.sampleRate = sampleRate
-        self.timelist = np.arange(len(self.waveform))/sampleRate
+        self.timelist = np.arange(len(self.waveform))/self.sampleRate
+        self.title = title
 
         self.clocks = None
         self.clockTime = None
@@ -133,11 +134,14 @@ class Waveform():
     ### Since this is the superclass this has the most basic plots. Inherited classes will have more specific plots (potential overrides)
     #####
 
-    def plotWaveform(self, ax: plt.Axes=None, title = None, figsize=(25, 15)):
+    def plotWaveform(self, ax: plt.Axes=None, title = None, figsize=(25, 15), colour = None, scale = 1, offset = 0, pos = 0):
         if ax is None:
             fig, ax = plt.subplots(figsize=figsize)
 
-        ax.plot(self.timelist*10**9, self.waveform)
+        if colour is not None:
+            ax.plot(self.timelist*10**9, scale * self.waveform + offset, color=colour, label = self.title)
+        else:
+            ax.plot(self.timelist*10**9, scale * self.waveform + offset, self.title)
 
         if title is not None:
             ax.set_title(title)
@@ -149,10 +153,10 @@ class Waveform():
 
         ## For the basic plot not sure what else one might want
 
-        stats_text = f"P2P : {self.peakToPeak:.2f}\nRMS : {self.RMS:.2f} ADC\nFrequency : {self.frequencyFFT*10**(-6):.2f} MHz"
+        stats_text = f" P2P : {self.peakToPeak:.2f} ADC\n RMS : {self.RMS:.2f} ADC\nFreq : {self.frequencyFFT*10**(-6):.2f} MHz"
         
-        ax.text(0.97, 0.97, stats_text, verticalalignment='top', horizontalalignment='right',
-            transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.5))
+        ax.text(1, 0.98 - pos, stats_text, verticalalignment='top', horizontalalignment='right',
+            transform=ax.transAxes, color=colour, bbox=dict(facecolor='black', alpha=0.5))
         
     def plotClocks(self, clocks, ax: plt.Axes=None, title = None, figsize=(25, 15)):
         if ax is None:
@@ -179,13 +183,18 @@ class Waveform():
         ax.text(0.97, 0.97, stats_text, verticalalignment='top', horizontalalignment='right',
             transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.5))
 
-    def plotFFT(self, ax: plt.Axes=None, title = None, figsize=(25, 15)):
+    def plotFFT(self, ax: plt.Axes=None, title = None, figsize=(25, 15), colour = None):
         if ax is None:
             fig, ax = plt.subplots(figsize=figsize)
 
         try:
             self.doFFTs()
-            ax.plot(self.xf*10**(-6), 20 * np.log10(self.mag_spectrum), label='scipy FFT')
+
+            if colour is not None:
+                ax.plot(self.xf*10**(-6), 20 * np.log10(self.mag_spectrum), label=self.title, color=colour)
+            else:
+                ax.plot(self.xf*10**(-6), 20 * np.log10(self.mag_spectrum), label=self.title)
+
         except:
             ## Yeah, sometimes this won't work (typically an issue with the biquad), better not crash everything)
             print("It's just not possible")
@@ -195,7 +204,7 @@ class Waveform():
         ax.set_xlabel("Frequency (MHz)")
         ax.set_ylabel("Magnitude (arb.)")
         
-        stats_text = f"Frequency : {self.frequencyFFT*10**(-6):.2f} MHz\nAmplitude : {self.amplitudeFFT:.2f} ADC"
+        # stats_text = f"Frequency : {self.frequencyFFT*10**(-6):.2f} MHz\nAmplitude : {self.amplitudeFFT:.2f} ADC"
         
-        ax.text(0.97, 0.97, stats_text, verticalalignment='top', horizontalalignment='right',
-            transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.5))
+        # ax.text(0.97, 0.97, stats_text, verticalalignment='top', horizontalalignment='right',
+        #     transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.5))
