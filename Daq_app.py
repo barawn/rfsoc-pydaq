@@ -32,20 +32,20 @@ class RFSoC_App(RFSoC_Daq):
 
         self.app = APP_GUI()
 
-        self.generate_test_waveforms()
+        # self.generate_test_waveforms()
 
-        self.app.oscilloscope.settings_frame.update_channels(channel_names)
+        self.app.oscilloscope.update_channels(channel_names)
 
-        self.load_button = tk.Button(self.app.oscilloscope.settings_frame.basic_frame, text = "Load", command = self.rfsocLoad)
+        self.load_button = tk.Button(self.app.oscilloscope.basic_frame, text = "Load", command = self.rfsocLoad)
         self.load_button.grid(row=2, column=1)
 
-        self.sample_number_submit = submitButton(self.app.oscilloscope.settings_frame.basic_frame, "Clock no. : ", int(200), lambda: self.submit_sample_number(self.sample_number_submit.get_value()))
-        self.save_name_submit = submitButton(self.app.oscilloscope.settings_frame.basic_frame, "Save Name : ", "Temp", lambda: self.submit_save_name(self.submit_save_name.get_value()))
+        self.sample_number_submit = submitButton(self.app.oscilloscope.basic_frame, "Clock no. : ", int(200), lambda: self.submit_sample_number(self.sample_number_submit.get_value()))
+        self.save_name_submit = submitButton(self.app.oscilloscope.basic_frame, "Save Name : ", "Temp", lambda: self.submit_save_name(self.submit_save_name.get_value()))
 
         self.sample_number_submit.grid(row=0, column=0, columnspan=4)
         self.save_name_submit.grid(row=1, column=0, columnspan=4)
         
-        self.acquire_button = tk.Button(self.app.oscilloscope.settings_frame.basic_frame, text = "Acquire", command = self.generate_waveforms)
+        self.acquire_button = tk.Button(self.app.oscilloscope.basic_frame, text = "Acquire", command = self.generate_waveforms)
 
         self.app.mainloop()
 
@@ -61,7 +61,7 @@ class RFSoC_App(RFSoC_Daq):
         self.save_name = SaveName
 
 
-    def rfsocLoad(self, hardware=None):
+    def rfsocLoad(self, hardware='top'):
         super().rfsocLoad(hardware)
         self.generate_GUI()
 
@@ -70,14 +70,13 @@ class RFSoC_App(RFSoC_Daq):
 
         self.acquire_button.grid(row=2, column=2)
 
-        self.app.oscilloscope.settings_frame.generate_local_GUI()
-
+        self.app.oscilloscope.generate_local_GUI()
 
     def generate_waveforms(self):
         super().generate_waveforms()
-        self.app.oscilloscope.trace_display.plot_waveform(self.waveforms)
-        self.app.oscilloscope.fft_display.plot_fft(self.waveforms)
-        self.app.oscilloscope.settings_frame.update_settings()
+        self.app.oscilloscope.display_frame.plot_waveform(self.waveforms)
+        self.app.oscilloscope.display_frame.plot_fft()
+        self.app.oscilloscope.update_settings()
 
     def generate_test_waveforms(self):
         self.waveforms = []
@@ -87,8 +86,8 @@ class RFSoC_App(RFSoC_Daq):
             else:
                 self.waveforms.append(None)
 
-        self.app.oscilloscope.trace_display.plot_waveform(self.waveforms)
-        self.app.oscilloscope.fft_display.plot_fft(self.waveforms)
+        self.app.oscilloscope.display_frame.plot_waveform(self.waveforms)
+        self.app.oscilloscope.display_frame.plot_fft()
 
 
 if __name__ == "__main__":

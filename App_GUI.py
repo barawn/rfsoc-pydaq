@@ -16,6 +16,7 @@ from waveframe.Waveframes import Waveframes
 from Waveforms.Waveform import Waveform
 
 from Oscilloscope_GUI import Oscilloscope_GUI
+from Oscilloscope import Oscilloscope
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ class APP_GUI(tk.Tk):
         self.logger = logging.getLogger(__name__)
 
         ##Setting up all the frames
-        self.oscilloscope = Oscilloscope_GUI(self, self.screen_width/108, 0.8*self.screen_height/108)
+        self.oscilloscope = Oscilloscope(self, 0.95*self.screen_width/100, 0.8*self.screen_height/100)
         # self.oscilloscope.grid(row=0, column=1, rowspan=2)
         self.oscilloscope.grid(row=0, column=0, columnspan=2)
 
