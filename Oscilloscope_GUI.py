@@ -20,10 +20,10 @@ class Oscilloscope_GUI(tk.Frame):
         ##Maybe have Oscilloscope_Display have subplots(2,1)
         #Then they could share the same waveform instance
 
-        self.trace_display = Oscilloscope_Display(self, width=0.85*self.width, height=self.height)
+        self.trace_display = Oscilloscope_Display(self, width=0.2*self.width, height=self.height)
         self.trace_display.get_tk_widget().grid(row=0, column=0, pady=5)
 
-        self.fft_display = Oscilloscope_Display(self, width=0.85*self.width, height=self.height)
+        self.fft_display = Oscilloscope_Display(self, width=0.2*self.width, height=self.height)
         # self.fft_display.get_tk_widget().grid(row=1, column=0)
 
         self.settings_frame = Oscilloscope_Settings(self)

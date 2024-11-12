@@ -6,10 +6,9 @@ import zcurfclk
 import numpy as np
 
 class zcuMTS(Overlay):
-    def __init__(self, bitfile_name='zcu111_mts.bit', **kwargs):
+    def __init__(self, bitfile_name='zcu111_top.bit', **kwargs):
 
         # Check whether zocl is working
-
         output = subprocess.check_output(['lsmod'])
         if b'zocl' in output:
             rmmod_output = subprocess.run(['rmmod', 'zocl'])
@@ -33,7 +32,7 @@ class zcuMTS(Overlay):
                            GPIO(GPIO.get_gpio_pin(13), 'in'),
                            GPIO(GPIO.get_gpio_pin(14), 'in'),
                            GPIO(GPIO.get_gpio_pin(15), 'in') ]
-        
+
         super().__init__(resolve_binary_path(bitfile_name), **kwargs)
 
         self.dbg = self.debug_bridge_0
@@ -48,14 +47,14 @@ class zcuMTS(Overlay):
     def init_adc_memory(self, channels, range = None):
         for i, channel in enumerate(channels):
             if channel != None and channel != "":
-                self.adc_memory.append(self.memdict_to_view(ip = self.adcIP[i]), range = range)
+                self.adc_memory.append(self.memdict_to_view(ip = self.adcIP[i], range = range))
             else:
                 self.adc_memory.append(None)
     
     def memdict_to_view(self, ip, dtype='int16', range = None):
         """ Configures access to internal memory via MMIO"""
         baseAddress = self.mem_dict[ip]["phys_addr"]
-        mem_range = range if range is not None else self.mem_dict[ip]["addr_range"]
+        mem_range = self.mem_dict[ip]["addr_range"] #range if range is not None else self.mem_dict[ip]["addr_range"]
         ipmmio = MMIO(baseAddress, mem_range)
         return ipmmio.array[0:ipmmio.length].view(dtype)
     
@@ -78,11 +77,12 @@ class zcuMTS(Overlay):
         self.gpio_trig.write(1)
         self.gpio_trig.write(0)
         for i in range(4):
-            if self.adc_memory[i] != None:
+            if self.adc_memory[i] is not None:
                 buf[i] = np.copy(self.adc_memory[i][0:len(buf[i])])
             
 def resolve_binary_path(bitfile_name):
     """ this helper function is necessary to locate the bit file during overlay loading"""
+    MODULE_PATH = '/home/xilinx/python/'
     if os.path.isfile(bitfile_name):
         return bitfile_name
     elif os.path.isfile(os.path.join(MODULE_PATH, bitfile_name)):

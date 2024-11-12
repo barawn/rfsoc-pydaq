@@ -26,7 +26,7 @@ class RFSoC_Daq:
         self._channel_names = channel_names
 
         self._adcBuffer = np.zeros((self.channel_num, self._sample_size), np.int16)
-        self._waveforms = None
+        self.waveforms = []
 
         self.dev = None
 
@@ -81,11 +81,11 @@ class RFSoC_Daq:
     def _reset_adcBuffer(self):
         self._adcBuffer = np.zeros((self.channel_num, self._sample_size), np.int16)
     
-    def extract__channel(self, ch: int):
+    def extract_channel(self, ch: int):
         """Method to retrieve a specific channel by index."""
         if ch < 0 or ch >= self.channel_num:
             raise IndexError(f"Channel index {ch} out of range")
-        return self.adcBuffer[ch] << 4
+        return self.adcBuffer[ch] >> 4
     
     ###########################################
     ##### Actual Data Aquisition Stuff
@@ -104,7 +104,7 @@ class RFSoC_Daq:
             file_path = filedialog.askopenfilename(title="Select an overlay module",
                                             filetypes=[("Python files","*.py"),
                                                         ("All files", "*.*")])
-        
+            
         self.logger.debug("Asked to load overlay at %s" % file_path)
         newdir = os.path.dirname(os.path.abspath(file_path))    
 
@@ -166,53 +166,50 @@ class RFSoC_Daq:
         self.dev.init_adc_memory(self.channel_names, self.sample_size*2)
         self.max_sample_size = self.sample_size
 
+        ##This initiates the waveform instances so they can just be updated later
+        ##Also initial Acquire doesn't work apparently and this gets it out the way
+        self.rfsocAcquire()
+        self.waveforms = []
+        
+        for i, channel in enumerate(self.channel_names):
+            if channel != None and channel != "":
+                self.waveforms.append(Waveform(self.extract_channel(ch=i), tag = channel))
+            else:
+                self.waveforms.append(None)
+
         try:
             from serialcobsdevice import SerialCOBSDevice       ###Since this comes from the loaded zcuagc overlay it may not be recognised in vscode without the explicit import 
             self.setSDV(SerialCOBSDevice('/dev/ttyPS1', 1000000))
         except:
             self.logger.debug("It would appear the overloay you have tried to load doesn't contain SerialCOBSDevice")
         return
-
+    
     def rfsocAcquire(self):
         if self.dev is None:
             self.logger.error("No RFSoC device is loaded!")
             
-        self.dev.internal_capture(self.adcBuffer,
-                                    self.channel_num)
+        self.dev.internal_capture(self.adcBuffer)
         
     def generate_waveforms(self):
         self.rfsocAcquire()
 
-        self.waveforms = []
-
-        for i, channel in enumerate(self.channel_names):
-            if channel != None and channel != "":
-                self.waveforms.append(Waveform(self.extract__channel(ch=i), title = channel))
-            else:
-                self.waveforms.append(None)
-        
+        for i, waveform in enumerate(self.waveforms):
+            if self.channel_names[i] != None and self.channel_names[i] != "":
+                waveform.waveform = self.extract_channel(ch=i)
 
 if __name__ == "__main__":
-    daq = RFSoC_Daq()
+    import time
 
-    ##This was just to test certain properties work properly
-    daq.channel_names = ["Channel 0", "Channel 1", "Channel 2", None]
-    daq.sample_size = 16
+    daq = RFSoC_Daq(sample_size = 200*8, channel_names = ["ADC224_T0_CH0 (LF)", "", "ADC225_T1_CH0 (HF)", ""])
 
-    print(daq.adcBuffer.shape)
+    daq.rfsocLoad(hardware='zcumts')
 
-    daq.sample_size = 32
-    print(daq.adcBuffer.shape)
+    start_time = time.time()
+    for i in range(100000):
+        daq.generate_waveforms()
 
-    daq.channel_names = ["Channel 1", "Channel 2", None, None]
-    print(daq.adcBuffer.shape)
+    end_time = time.time()
 
-    ##Actual DAQ stuff
-    daq.rfsocLoad(hardware="zcumts")
-    #Should print out some loading stuff
-
-    daq.generate_waveforms()
-    #Should produces some waveform instances from daq internal capture
-
-    print(daq.waveforms[0].waveform[0:10])
-    #Should output array where values aren't all zero    
+    # Calculate elapsed time
+    execution_time = end_time - start_time
+    print(f"Execution time: {execution_time} seconds")

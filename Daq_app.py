@@ -62,7 +62,7 @@ class RFSoC_App(RFSoC_Daq):
 
 
     def rfsocLoad(self, hardware=None):
-        # super().rfsocLoad(hardware)
+        super().rfsocLoad(hardware)
         self.generate_GUI()
 
     def generate_GUI(self):
@@ -83,7 +83,7 @@ class RFSoC_App(RFSoC_Daq):
         self.waveforms = []
         for i in range(4):
             if self.channel_names[i] != None:
-                self.waveforms.append(Waveform(np.array([np.sin((i+1)/40 * x) for x in range(1000)]), title=f"lamba : {(i+1)/40}"))
+                self.waveforms.append(Waveform(np.array([np.sin((i+1)/40 * x) for x in range(1000)]), tag=f"lamba : {(i+1)/40}"))
             else:
                 self.waveforms.append(None)
 
@@ -97,7 +97,7 @@ if __name__ == "__main__":
 
     obj = RFSoC_App()
 
-    obj.generate_test_waveforms()
+    # obj.generate_test_waveforms()
 
     # obj.channel_names = ["Channel 0", "Channel 1", "Channel 2", None]
     # obj.sample_size = 16

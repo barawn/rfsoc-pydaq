@@ -26,8 +26,8 @@ class APP_GUI(tk.Tk):
         ##Basic Window Stuff
         self.title("RFSoC PyDaq Interface")
 
-        self.screen_width = self.winfo_screenwidth()
-        self.screen_height = self.winfo_screenheight()
+        self.screen_width = int(self.winfo_screenwidth())
+        self.screen_height = int(self.winfo_screenheight()/2)
 
         # logging.basicConfig(level=logging.DEBUG)
 
