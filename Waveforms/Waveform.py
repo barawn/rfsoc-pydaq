@@ -99,10 +99,7 @@ class Waveform():
         if ax is None:
             fig, ax = plt.subplots(figsize=figsize)
 
-        if colour is not None:
-            ax.plot(self.time_list*10**9, scale * self.waveform + offset, color=colour, label = self.tag)
-        else:
-            ax.plot(self.time_list*10**9, scale * self.waveform + offset, label = self.tag)
+        ax.plot(self.time_list*10**9, scale * self.waveform + offset, color=colour, label = self.tag)
 
         if title is not None:
             ax.set_title(title)
@@ -140,14 +137,10 @@ class Waveform():
         if ax is None:
             fig, ax = plt.subplots(figsize=figsize)
 
-        try:
-            if colour is not None:
-                ax.plot(self.xf*10**(-6), 20 * np.log10(self.mag_spectrum), label=self.title, color=colour)
-            else:
-                ax.plot(self.xf*10**(-6), 20 * np.log10(self.mag_spectrum), label=self.title)
-        except:
-            ## Yeah, sometimes this won't work (typically an issue with the biquad), better not crash everything)
-            print(f"It's just not possible to plot {self.tag}'s fft at this moment")
+        # try:
+        ax.plot(self.xf*10**(-6), 20 * np.log10(self.mag_spectrum), label=self.tag, color=colour)
+        # except:
+        #     print(f"It's just not possible to plot {self.tag}'s fft at this moment")
 
         if title is not None:
             ax.set_title(title)

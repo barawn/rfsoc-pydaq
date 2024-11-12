@@ -1,18 +1,41 @@
 import tkinter as tk
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
 import math
 import numpy as np
+import matplotlib.pyplot as plt
 
+from Oscilloscope_Display import Oscilloscope_Display
+from Oscilloscope_Settings import Oscilloscope_Settings
+from Waveforms.Waveform import Waveform
 from widgets.SubmitButton import submitButton
 
-class Oscilloscope_Settings(tk.Frame):
-    def __init__(self, parent : tk.Frame):
-        self.parent = parent
-        super().__init__(self.parent)
+class Oscilloscope(tk.Frame):
+    def __init__(self, root, width, height):
+        self.root = root
+        self.width, self.height = width, height
+        super().__init__(self.root, width=self.width, height=self.height)
 
-        self.channels_frame = tk.Frame(self)
+        #The colours for the 4 optional channel traces. Only works on black background
+        self.colours = ['dodgerblue', 'gold', 'red', 'limegreen']
+        #White background colours. I know purple is not ideal hear but yellow won't show up on white
+        # self.colours = ['royalblue', 'red', 'green', 'purple']
+
+        self.arr_plot = [False, False, False, False]
+        self.arr_fft = [False, False, False, False]
+        self.arr_offset = [0, 0, 0, 0]
+        self.arr_scale = [1, 1, 1, 1]
+
+        self.display_frame = Oscilloscope_Display(self, width=0.8*self.width, height=self.height)
+        self.display_frame.get_tk_widget().grid(row=0, column=0)
+
+        self.settings_frame = tk.Frame(self, width=0.2*self.width)
+        self.settings_frame.grid(row=0, column=1)
+
+        self.channels_frame = tk.Frame(self.settings_frame)
         self.channels_frame.grid(row=0, column=0)
 
-        self.basic_frame = tk.Frame(self)
+        self.basic_frame = tk.Frame(self.settings_frame)
         self.basic_frame.grid(row=1, column=0)
 
         self.update_button = tk.Button(self.basic_frame, text = "Update", command = self.update_settings)
@@ -21,10 +44,7 @@ class Oscilloscope_Settings(tk.Frame):
 
         self.update_button.grid(row=2, column=3)
 
-        self.arr_plot = [False, False, False, False]
-        self.arr_fft = [False, False, False, False]
-        self.arr_offset = [0, 0, 0, 0]
-        self.arr_scale = [1, 1, 1, 1]
+        
 
     def update_settings(self):
         self.get_channel_plot()
@@ -32,8 +52,9 @@ class Oscilloscope_Settings(tk.Frame):
         self.get_channel_offset()
         self.get_channel_scale()
 
-        self.parent.trace_display.plot_waveform()
-        self.parent.fft_display.plot_fft()
+        self.display_frame.update_axes()
+        self.display_frame.plot_waveform()
+        self.display_frame.plot_fft()
 
     def update_channels(self, channel_names : list[str], daq = None):
         for widget in self.channels_frame.winfo_children():
@@ -43,7 +64,7 @@ class Oscilloscope_Settings(tk.Frame):
 
         for i, channel in enumerate(channel_names):
             if channel != None and channel != "":
-                self.channels.append(Oscilloscope_Channels(self.channels_frame, channel, border_colour=self.parent.colours[i]))
+                self.channels.append(Oscilloscope_Channels(self.channels_frame, channel, border_colour=self.colours[i]))
 
                 ##its because you're indexing here
                 self.channels[i].grid(row=i, column=0, padx=10, pady=10)
@@ -99,7 +120,7 @@ class Oscilloscope_Settings(tk.Frame):
     def generate_local_GUI(self):
         self.save_plot_button.grid(row = 2, column= 0)
         self.save_trace_button.grid(row = 2, column= 1)
-    
+
     def create_submit_boxes(self, daq):
         self.sample_number_submit = submitButton(self.basic_frame, "Sample Number (multiplied by 8) : ", int(200), lambda: daq.submitNumSamples(self.sample_number), 0)
         
@@ -114,6 +135,7 @@ class Oscilloscope_Settings(tk.Frame):
         self.update_channels(channel_names, daq)
         self.create_submit_boxes(daq)
         self.create_buttons(daq)
+
 
 class Oscilloscope_Channels(tk.Frame):
     def __init__(self, parent : tk.Frame, title : str, var : bool = False, border_width=10, border_colour="red", colour_thickness=5):
@@ -178,17 +200,107 @@ class Oscilloscope_Channels(tk.Frame):
 
         self.channel_scale_frame.grid(row=2, column=1)
 
+class Oscilloscope_Display(FigureCanvasTkAgg):
+    def __init__(self, parent, width=6, height=4):
+        self.parent = parent
+        self.figure = Figure(figsize=(width, height))
+
+        self.figure.patch.set_facecolor('black')
+
+        self.update_axes()
+
+        
+        super().__init__(self.figure, self.parent)
+
+        self.figure.subplots_adjust(left=0.04, right=0.97, top=0.9, bottom=0.1)
+
+        self.draw()
+
+        # self.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+
+    def update_axes(self):
+        self.figure.clear()
+        if all(not item for item in self.parent.arr_fft) == True:
+            self.ax1 = self.figure.add_axes([0.1, 0.1, 0.85, 0.8])
+            self.ax2 = None
+        else:
+            self.ax1 = self.figure.add_axes([0.1, 0.55, 0.85, 0.35])
+            self.ax2 = self.figure.add_axes([0.1, 0.1, 0.85, 0.35])
+            
+        self.apply_axis_style(self.ax1)
+        if self.ax2:
+            self.apply_axis_style(self.ax2)
+
+    def apply_axis_style(self, ax: plt.Axes):
+        ax.set_facecolor('black')
+        ax.tick_params(axis='both', colors='white')
+
+        for spine in ax.spines.values():
+            spine.set_color('white')
+            spine.set_linewidth(1)
+
+    def plot_waveform(self, waveforms : list[Waveform] = None):
+        if waveforms != None:
+            self.waveforms = waveforms
+
+        self.ax1.clear()
+        self.ax1.grid(True)
+
+        for i, trace in enumerate(self.waveforms):
+            if trace != None:
+                if self.parent.arr_plot[i] == True:
+                    trace.plotWaveform(ax = self.ax1, colour = self.parent.colours[i], scale = self.parent.arr_scale[i], offset = self.parent.arr_offset[i], pos=0.18*i)
+            # trace.plotWaveform(ax = self.ax1)
+
+        self.ax1.set_title("Channel Traces", color='white')
+        self.ax1.set_xlabel('Time (ns)', color='white')
+        self.ax1.set_ylabel('ADC Counts', color='white')
+
+        self.ax1.legend(loc="lower right")
+        self.draw()
+
+    def plot_fft(self):
+        if self.ax2:
+            self.ax2.clear()
+            self.ax2.grid(True)
+
+            for i, spectrum in enumerate(self.waveforms):
+                if spectrum != None:
+                    if self.parent.arr_fft[i] == True: 
+                        spectrum.plotFFT(ax = self.ax2, colour = self.parent.colours[i])
+                # spectrum.plotFFT(ax = self.ax2)
+
+            self.ax2.set_title("Channel Spectra", color='white')
+            self.ax2.set_xlabel('Frequency (MHz)', color='white')
+            self.ax2.set_ylabel('Magnitude (arb.)', color='white')
+            
+            self.ax2.legend()
+            self.draw()
+
 if __name__ == "__main__":
     root = tk.Tk()
-    root.title("Oscilloscope Channel Settings")
+    root.title("Oscilloscope GUI")
+    root.configure(bg="green")
 
-    root.colours = ['dodgerblue', 'gold', 'red', 'limegreen']
+    screen_width = root.winfo_screenwidth()/100
+    screen_height = root.winfo_screenheight()/100
 
-    settings_frame = Oscilloscope_Settings(root)
-    settings_frame.grid(row=0, rowspan=2, column=1, padx=10, pady=10)
+    GUI = Oscilloscope(root,width=0.95*screen_width,height=0.8*screen_height)
+    GUI.pack(fill=tk.BOTH, expand=True)
 
     channel_names = ["ADC224_T0_CH0 (LF)", None, "ADC225_T1_CH0 (HF)", "ADC225_T1_CH1 (HF)"]
 
-    settings_frame.update_channels(channel_names)
+    GUI.update_channels(channel_names)
+
+    sample_data = [Waveform(np.array([np.sin(0.05 * x) for x in range(1000)]), tag='Demo 1'), 
+                   Waveform(np.array([np.sin(0.1 * x) for x in range(1000)]), tag='Demo 2'),
+                   Waveform(np.array([np.sin(0.2 * x) for x in range(1000)]), tag='Demo 3'),
+                   Waveform(np.array([np.sin(0.01 * x) for x in range(1000)]), tag='Demo 4')]
+
+    GUI.display_frame.update_axes()
+    GUI.display_frame.plot_waveform(sample_data)
+
+    GUI.display_frame.plot_fft()
 
     root.mainloop()

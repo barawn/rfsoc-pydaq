@@ -91,19 +91,20 @@ class RFSoC_Daq:
     ##### Actual Data Aquisition Stuff
     ###########################################
 
-    def rfsocLoad(self, hardware = None):
+    def rfsocLoad(self, bit_name = "top"):
         """Load an overlay file describing an RFSoC instance.
         The overlay needs to support being created bare (just "overlayName()")
         and must support the "internal_capture( buffer, numChannels )"
         function.
         """            
-
-        if hardware is not None:
-            file_path = f'/home/xilinx/python/{hardware}.py'
-        else:
-            file_path = filedialog.askopenfilename(title="Select an overlay module",
-                                            filetypes=[("Python files","*.py"),
-                                                        ("All files", "*.*")])
+        
+        file_path = f'/home/xilinx/python/zcumts.py'
+        # if hardware is not None:
+        #     file_path = f'/home/xilinx/python/{hardware}.py'
+        # else:
+        #     file_path = filedialog.askopenfilename(title="Select an overlay module",
+        #                                     filetypes=[("Python files","*.py"),
+        #                                                 ("All files", "*.*")])
             
         self.logger.debug("Asked to load overlay at %s" % file_path)
         newdir = os.path.dirname(os.path.abspath(file_path))    
@@ -150,7 +151,9 @@ class RFSoC_Daq:
                 del sys.modules[module.__name__]
                 raise LocalException("The Overlay %s in module %s has no callable internal_capture method" % (theClass.__name__ , module.__name__ ))
             self.logger.debug("Found RFSoC overlay %s" % theClass.__name__)
-            self.dev = theClass()
+            ##Changed this to instantiate with bit file
+            bitfile = f'zcu111_{bit_name}.bit'
+            self.dev = theClass(bitfile)
             self.logger.debug("Created RFSoC device")
         except LocalException as e:
             self.logger.error(str(e))
@@ -202,7 +205,7 @@ if __name__ == "__main__":
 
     daq = RFSoC_Daq(sample_size = 200*8, channel_names = ["ADC224_T0_CH0 (LF)", "", "ADC225_T1_CH0 (HF)", ""])
 
-    daq.rfsocLoad(hardware='zcumts')
+    daq.rfsocLoad(hardware='top')
 
     start_time = time.time()
     for i in range(100000):
