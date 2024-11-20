@@ -37,7 +37,7 @@ class Biquad:
 
     @A.setter
     def A(self, value):
-        if abs(value) >= 8:
+        if abs(value) > 8:
             raise ValueError("A must be 4 within bits wide")
         self._A = value
 
@@ -47,7 +47,7 @@ class Biquad:
 
     @B.setter
     def B(self, value):
-        if abs(value) >= 8:
+        if abs(value) > 8:
             raise ValueError("B must be 4 within bits wide")
         self._B = value
 
@@ -57,7 +57,7 @@ class Biquad:
 
     @P.setter
     def P(self, value):
-        if value >= 1:
+        if value > 1:
             raise ValueError("P must be less than 1")
         if value < 0:
             raise ValueError("P must be positive")
@@ -156,17 +156,33 @@ class Biquad:
     def C0(self):
         return self._C0
 
+    @C0.setter
+    def C0(self, value):
+        self._C0 = value
+
     @property
     def C1(self):
         return self._C1
+
+    @C1.setter
+    def C1(self, value):
+        self._C1 = value
 
     @property
     def C2(self):
         return self._C2
 
+    @C2.setter
+    def C2(self, value):
+        self._C2 = value
+
     @property
     def C3(self):
         return self._C3
+    
+    @C3.setter
+    def C3(self, value):
+        self._C3 = value
 
     def _update_iir(self):
         rho = self.P**15 / np.sin(self.theta)
@@ -183,9 +199,17 @@ class Biquad:
     def a1(self):
         return self._a1
 
+    @a1.setter
+    def a1(self, value):
+        self._a1 = value
+
     @property
     def a2(self):
         return self._a2
+
+    @a2.setter
+    def a2(self, value):
+        self._a2 = value
 
     def _update_as(self):
         self._a1 = 2 * self.P * np.cos(self.theta)
@@ -275,7 +299,7 @@ class Biquad:
 
     def run_Biquad(self):
         self.run_IIR()
-        self.run_incremental()
+        # self.run_incremental()
 
     ###########################################
     ##### Print Coefficients
@@ -290,11 +314,30 @@ class Biquad:
 
         print(f"\nC0 : {self.C0}\nC1 : {self.C1}\nC2 : {self.C2}\nC3 : {self.C3}\n")
 
-        print(f"\na1 : {self.a1}\na2 : {self.a2}")
+        print(f"\na1 : {self.a1}\na2 : {self.a2}\n")
 
     ###########################################
     ##### Calculators
     ###########################################
+
+    def quantise_coeffs(self):
+        self.A = self.calc_q_format(self.A, 4, 14)
+        self.B = self.calc_q_format(self.B, 4, 14)
+
+        self.Xn = self.calc_q_format(self.Xn, 4, 14)
+
+        self.Dff = self.calc_q_format(self.Dff, 4, 14)
+        self.Dfg = self.calc_q_format(self.Dfg, 4, 14)
+        self.Egg = self.calc_q_format(self.Egg, 4, 14)
+        self.Egf = self.calc_q_format(self.Egf, 4, 14)
+
+        self.C0 = self.calc_q_format(self.C0, 4, 14)
+        self.C1 = self.calc_q_format(self.C1, 4, 14)
+        self.C2 = self.calc_q_format(self.C2, 4, 14)
+        self.C3 = self.calc_q_format(self.C3, 4, 14)
+
+        self.a1 = self.calc_q_format(self.a1, 4, 14)
+        self.a2 = self.calc_q_format(self.a2, 4, 14)
 
     def calc_chebyshev(self, num):
         return np.sin((num + 1) * self.theta) / np.sin(self.theta)
@@ -305,6 +348,21 @@ class Biquad:
     ##############
     ##### n-bit overflow, i.e. set bit width
     ##############
+
+    def calc_q_format(self, value, m, n):
+        min_val = -2**(m - 1)
+        max_val = 2**(m - 1) - (1 / 2**n)
+        scale_factor = 2**n
+
+        scaled_value = np.floor(value * scale_factor)
+        
+        range_width = 2**(m + n)
+        wrapped_value = ((scaled_value - min_val * scale_factor) % range_width) + min_val * scale_factor
+        
+        q_value = wrapped_value / scale_factor
+        
+        return q_value
+
 
     def calc_n_bit(self, value, n):
         min_val = -2**(n-1)

@@ -1,201 +1,314 @@
 ##Python Imports
 import numpy as np
-import tkinter as tk
-from tkinter import filedialog
-from scipy.fft import fft, ifft, fftfreq
-from scipy.constants import speed_of_light
-from typing import Callable
 
-#System Imports
-import logging
-import subprocess
-import os, sys, inspect, importlib, configparser, csv
+import sys, os
+
+sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))
 
 from RFSoC_Daq import RFSoC_Daq
-
-from widgets.SubmitButton import submitButton
-
-from AGC.AgcNotebook import AgcNotebook
-from waveframe.Waveframe import Waveframe
-
 from Waveforms.Waveform import Waveform
 from Waveforms.AGC import AGC
 
-logger = logging.getLogger(__name__)
+import threading
+from widgets.TaskManager import TaskManager
+
 
 #FPGA Class
+
 class AGC_Daq(RFSoC_Daq):
-    """
-    This is the base class for using the agc overlay.
+    def __init__(self, sample_size: int = 64*8, 
+                 channel_names = ["AGC_Core", "ADC224_T0_CH0", None, None]):
+        super().__init__(sample_size, channel_names)
 
-    Should only be ammended with core agc methods/protocols
-    """
-    def __init__(self,
-                 root: tk.Tk = None,
-                 frame: tk.Frame = None,
-                 numChannels: int = 2,
-                 numSamples: int = 2**11,
-                 channelName = ["","","","","","","",""]):
-        super().__init__(root, frame, numChannels, numSamples, channelName)
-
-        self.sdv = None
-        self.rfsocLoad("zcuagc")
-    ############################
-    ##Maybe write your code here?
-    ############################
-
-
+        self.rfsocLoad("agc")
 
     ############################
     ##Running agc core stuff
     ############################
-    def loadAGC(self):
+
+    @property
+    def scaling(self):
+        return self.sdv.read(0x10)
+
+    @scaling.setter
+    def scaling(self, value):
+        if isinstance(value, int):
+            self.sdv.write(0x10, value)
+            self.build_AGC()
+
+    @property
+    def offset(self):
+        return self.sdv.read(0x14)
+    
+    @offset.setter
+    def offset(self, value):
+        if isinstance(value, int):
+            self.sdv.write(0x14, value)
+            self.build_AGC()
+    
+    @property
+    def accumulator(self):
+        return self.sdv.read(0x4)/131072
+    
+    @property
+    def right_tail(self):
+        return self.sdv.read(0x8)
+
+    @property
+    def left_tail(self):
+        return self.sdv.read(0xc)
+    
+    @property
+    def tail_diff(self):
+        return self.right_tail-self.left_tail
+
+    ############################
+    ##Running agc core stuff
+    ############################
+
+    def load_AGC(self):
         if self.sdv is not None:
             self.sdv.write(0x00, 0x300)
-            logger.debug("AGC Loaded")
         else:
-            logger.debug("AGC not loaded, no sdv set")
-            raise ImportError("No serial cobbs device loaded the daq")
-
-    def applyAGC(self):
-        if self.sdv is not None:
-            self.sdv.write(0x00, 0x400)
-            logger.debug("AGC applied")
-        else:
-            logger.debug("AGC not applied, no sdv set")
             raise ImportError("No serial cobbs device loaded the daq")
         
-    def getAGC(self):
-        self.loadAGC()
-        self.applyAGC()
+    def apply_AGC(self):
+        if self.sdv is not None:
+            self.sdv.write(0x00, 0x400)
+        else:
+            raise ImportError("No serial cobbs device loaded the daq")
+        
+    def build_AGC(self):
+        self.load_AGC()
+        self.apply_AGC()
 
-    def runAGC(self):
+    def run_AGC(self):
         self.sdv.write(0,0x4)
         self.sdv.write(0,0x1)
         while ((self.sdv.read(0) & 0x2) == 0):
             pass
 
     ############################
-    ##Sets
+    ##PID Loops
     ############################
-    def setSDV(self, sdv):
-        self.sdv = sdv
-    
-    def setOffset(self, Value=80):
-        if isinstance(Value, int):
-            try:
-                self.sdv.write(0x14, Value)
-                self.getAGC()
+    ##This is quite messy, but I didn't write half of this and don't know whats removable
 
-                if self.getOffset() == Value:
-                    logger.debug(f"The offset has been set to {Value}")
-                    return f"The offset has been set to {Value}"
-                else:
-                    logger.debug("The offset has not been correctly set")
-                    return "The offset has not been correctly set"
-        
-            except:
-                logger.debug("It would appear that you don't have a sdv loaded in")
+    def run_pid_loop(self, should_run: bool):
+        self._pid_loop_running = should_run
+        if should_run:
+            self.task_thread = threading.Thread(target=self._pid_loop_method)
+            self.task_thread.start()
         else:
-            logger.debug("Please input a valid option")
-            return "Please input a valid option"
+            self._pid_loop_running = False
 
-    def setScaling(self, Value=4096):
-        if isinstance(Value, int):
-            try:
-                self.sdv.write(0x10, Value)
-                self.getAGC()
+    def _pid_loop_method(self):
+        self.logger.debug("PID!!!")
+        self.offset = 0
+        self.scaling = 4096
+        self.run_AGC()
 
-                if self.getScaling() == Value:
-                    logger.debug(f"The scaling has been set to {Value}")
-                    return f"The scaling has been set to {Value}"
-                else:
-                    logger.debug("The scaling has not been correctly set")
-                    return "The scaling has not been correctly set"
+        kp_val = 0
+        ki_val = -1 / 256  # from the scales.py
+
+        err_vals = []  # empty array for the error values
+        err = np.sqrt(self.accumulator) - 4  # sqrt accumulator we want an RMS of 4  
+        err_vals.append(0)
+        scaleFracBits = 12
+        convalScale = 1  # control value for the scaling 
+        arrconvalScale = []
+        arrconvalScale.append(convalScale)
+
+        iter = 0
+        while self._pid_loop_running:  # Use the new attribute to control the loop
+            self.scaling =int(convalScale * (2**scaleFracBits))
+            self.run_AGC()
+
+            sqrtFracBits = 9
+            rawVal = np.round(np.sqrt(self.accumulator) * (2**sqrtFracBits)) / (2**sqrtFracBits)
+            err = rawVal - 4
+            
+            convalScale += kp_val * (err - err_vals[iter - 1]) + ki_val * err
+            convalScale = np.round(convalScale * (2**scaleFracBits)) / (2**scaleFracBits)
+
+            err_vals.append(err)
+            arrconvalScale.append(convalScale)
+            iter += 1
+
+    def smoothing(self):# i am not quick this will take me a hot minute 
+        self.offset = 200 # set initial offset
+        self.scaling = 2**16 # set initial scaling
+        self.dev.internal_capture(self.adcBuffer) # initial acquire
+        self.run_AGC() # run the Agc
+
+        err_vals = [] # empty array for the error values
+        err_vals.append(self.tail_diff) # gt - lt 
+
+        for iter in range(1,10): # loop for offset
+            print(self.right_tail)
+            print(self.left_tail)
+            self.offset = 200 + iter * 10 # adjust the offset value  
+            self.run_AGC() 
+            err = self.tail_diff # new gt - lt 
+            print(err) 
+            alpha = 1/4 # alpha value est by Patrick
+            err_vals.append( alpha * err + ( 1 - alpha ) * err_vals[ iter - 1 ]) # y = ae + (1-a)y^-1
+           
+        print(err_vals)
+
+
+    def pid_loop_offset(self, testval): # for real this time
+        self.offset = 0 # set initial offset
+        self.scaling = 6000 # set initial scaling
+        #self.dev.internal_capture(self.adcBuffer, self.numChannels) # initial acquire
+        self.run_AGC() # run the
         
-            except:
-                logger.debug("It would appear that you don't have a sdv loaded in")
-        else:
-            logger.debug("Please input a valid option")
-            return "Please input a valid option"
-        
+        #kp_val = 1/128  # to begin with I guess
+        kp_val = 0
+        ki_val = - 1 / 256 # from the scales.py
 
-    ############################
-    ##Gets
-    ############################
-    def getOffset(self):
-        offset  = self.sdv.read(0x14)
-        logger.debug(f"The Offset is currently set to {offset}")
-        return offset
-
-    def getScaling(self):
-        scaling  = self.sdv.read(0x10)
-        logger.debug(f"The Scaling is currently set to {scaling}")
-        return scaling
-    
-    def getAccum(self):
-        return self.sdv.read(0x4)/131072
-    
-    def getTailDiff(self):
-        gt = self.sdv.read(0x8)
-        lt = self.sdv.read(0xc)
-        return gt-lt
-
-    ############################
-    ##App
-    ############################
-    
-    def submitOffsetValue(self, value):
-        OffsetValue = self.getSubmitInput(value, True)
-        logger.debug(f"You are setting the offset to: {OffsetValue}")
-        self.setScaling(OffsetValue)
-    
-    def submitScalingValue(self, value):
-        ScalingValue = self.getSubmitInput(value, True)
-        logger.debug(f"You are setting the scaling to: {ScalingValue}")
-        self.setScaling(ScalingValue)
-
-    ############################
-    ##Display
-    ############################
-    def setDisplay(self):
-        submit = self.root.nametowidget("submit")
-        submits = {}
-        submits['SetOffset'] = submitButton(submit, "Set the offset:", 0, lambda: self.submitOffsetValue(submits['SetOffset']), 10)
-        submits['SetScaling'] = submitButton(submit, "Set the scaling:", 0, lambda: self.submitScalingValue(submits['SetScaling']), 11)
-
-    ############################
-    ##DAQ Methods
-    # I woudln't touch
-    ############################
-
-    def rfsocLoad(self, hardware = None):
-        super().rfsocLoad(hardware)
-        try:
-            from serialcobsdevice import SerialCOBSDevice       ###Since this comes from the loaded zcuagc overlay it may not be recognised in vscode without the explicit import 
-            self.setSDV(SerialCOBSDevice('/dev/ttyPS1', 1000000))
-        except:
-            logger.debug("It would appear the overloay you have tried to load doesn't contain SerialCOBSDevice")
-        return
-    
-
-    def GuiAcquire(self):
-        self.rfsocAcquire()
-        arr = [AGC,Waveform]
-        for i in range(self.numChannels):
-            self.wf.waveframes[i].setWaveform(arr[i](self.adcBuffer[i] >> 4))
-            if self.wf.waveframes[i].toPlot == True:
-                self.wf.waveframes[i].notebook.plot()
+        err_vals = [] # empty array for the error values
+        err = self.tail_diff()
+        err_vals.append(0) # gt - lt 
+        conval = 0 
+        convals = []
+        convals.append(conval)
+        for iter in range(1,1000):
+            self.offset = conval 
+            self.run_AGC()
+            err = self.tail_diff
+            # no bigger than 32767 or less than -32768 --> clamp it yo
+            conval +=  kp_val * ( err - err_vals[iter - 1]) + ki_val * err
+            conval = int(conval)
+            if conval < -32768:
+                conval = -32768
+            if conval > 32767:
+                conval = 32767
                 
-        logger.debug("Acquired data and Plotted")
+            err_vals.append(err)
+            convals.append(conval)
 
-    def JupyterAcquire(self):
-        self.rfsocAcquire()
-        
-        self.waveforms = []
-        
-        self.waveforms.append(AGC(self.adcBuffer[0] >> 4))
-        self.waveforms.append(Waveform(self.adcBuffer[1] >> 4))
+        combined = np.column_stack((err_vals, convals))
+        np.savetxt(f'/home/xilinx/data/Testing_stuff.csv', combined, delimiter=',')
+        #np.savetxt(f'/home/xilinx/data/pid_loop_test{testval}.csv', combined, delimiter=',')
+        #self.writeCSV("Testing_stuff", err_vals, convals)
+        #self.writeCSV(f"pid_loop_test{testval}", err_vals, convals)
 
-if __name__ == '__main__':
-    pass
+
+    def pid_loop_scaling(self):
+        self.offset = 0
+        self.scaling = 4096
+        self.run_AGC()
+
+        kp_val = 0
+        ki_val = - 1 / 256 # from the scales.py
+
+        err_vals = [] # empty array for the error values
+        err =np.sqrt( self.accumulator()) - 4  # sqrt accumulator we want an RMS of 4  
+        err_vals.append(0)
+        scaleFracBits = 12
+        convalScale = 1 # control value for the scaling 
+        arrconvalScale = []
+        arrconvalScale.append(convalScale)
+        for iter in range(1,10000):
+            self.scaling = int(convalScale*(2**scaleFracBits))
+            self.run_AGC()
+
+            # need to add an exponential portion to this otherwise it will do nothing
+            # number of fractional bits out of sqrt
+            sqrtFracBits = 9
+            rawVal = np.round(np.sqrt(self.accumulator())*(2**sqrtFracBits))/(2**sqrtFracBits)
+            err = rawVal - 4
+        
+            # no bigger than 32767 or less than -32768 --> clamp it yo
+            convalScale +=  kp_val * ( err - err_vals[iter - 1]) + ki_val * err
+            convalScale = np.round(convalScale*(2**scaleFracBits))/(2**scaleFracBits)
+            # if convalScale < -32768:
+             #   convalScale = -32768
+            # if convalScale > 32767:
+             #   convalScale = 32767
+                
+            err_vals.append(err)
+            arrconvalScale.append(convalScale)
+            if (iter % 100) == 0:
+                print("err", err, "convalScale", convalScale)
+
+        combined = np.column_stack((err_vals, arrconvalScale))
+        np.savetxt(f'/home/xilinx/data/pid_loop_scale1.csv', combined, delimiter=',')
+        #np.savetxt(f'/home/xilinx/data/pid_loop_test{testval}.csv', combined, delimiter=',')
+        #self.writeCSV("Testing_stuff", err_vals, convals)
+        #self.writeCSV(f"pid_loop_test{testval}", err_vals, convals)
+
+
+    ############################
+    ##This is the accumulator stuff from earlier
+    ############################
+    def test_Accumulator(self):
+        self.run_AGC()
+        out = self.get_Adc(0)
+        rms_Waveform = np.average(np.square(out))
+
+        return rms_Waveform, self.accumulator
+
+    def multiple_Accumulator(self, duration = 100):
+        waveform_arr = []
+        accumulator_arr = []
+        for i in range(100):
+            waveform, accumulator = self.test_Accumulator()
+            waveform_arr.append(waveform)
+            accumulator_arr.append(accumulator)
+        return np.mean(waveform_arr), np.mean(accumulator_arr)
+    
+    def rms_Diff(self, duration = 100):
+        waveform_Avg, accumulator_Avg = self.multiple_Accumulator(duration)
+        return waveform_Avg, accumulator_Avg
+
+    def all_Accumulator(self, duration = 100):
+        waveform_arr = []
+        accumulator_arr = []
+        for i in range(duration):
+            self.scaling = i*10
+            waveform_Avg, accumulator_Avg = self.multiple_Accumulator()
+            waveform_arr.append(waveform_Avg)
+            accumulator_arr.append(accumulator_Avg)
+        return np.array(waveform_arr), np.array(accumulator_arr)
+
+    def all_RMS_Diff(self, duration = 100):
+        waveform, accumulator = self.all_Accumulator()
+        return waveform-accumulator
+    
+    ############################
+    ##DAQ Overload Methods
+    ############################
+
+    def create_waveforms(self):
+        self.waveforms.append(AGC(self.extract_channel(ch=0), tag = self.channel_names[0]))
+        self.waveforms.append(Waveform(self.extract_channel(ch=1), tag = self.channel_names[1]))
+        self.waveforms.append(None)
+        self.waveforms.append(None)
+
+
+if __name__ == "__main__":
+    import sys, os
+
+    sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))
+
+    from RFSoC_Daq import RFSoC_Daq
+
+    daq = AGC_Daq()
+
+    daq.generate_waveforms()
+
+    print(daq.waveforms[0].calc_rms())
+
+    daq.load_AGC()
+    daq.run_AGC()
+
+    daq.scaling = 17284
+    daq.offset = 93756
+
+    daq.load_AGC()
+    daq.run_AGC()
+
+    print(daq.waveforms[0].calc_rms())
+
+    print(daq.accumulator)

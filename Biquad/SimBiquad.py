@@ -5,7 +5,7 @@ from scipy.signal import freqz
 # import sys, os
 # sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))
 
-from Waveforms.Filterred import Filterred, Waveform
+from Waveforms.SimFilter import SimFilter
 from Biquad import Biquad
 
 class SimBiquad(Biquad):
@@ -41,15 +41,14 @@ class SimBiquad(Biquad):
         return self._length
 
     def _update_outputs(self):
-        if self._data is not None:
-            self._length = len(self._data) // 8
-            
-            self.u = np.zeros((self._length, 8))
-            self.y = np.zeros((self._length, 8))
-            self.f = np.zeros(self._length)
-            self.g = np.zeros(self._length)
-            self.F = np.zeros(self._length)
-            self.G = np.zeros(self._length)
+        self._length = len(self._data) // 8
+        
+        self.u = np.zeros((self._length, 8))
+        self.y = np.zeros((self._length, 8))
+        self.f = np.zeros(self._length)
+        self.g = np.zeros(self._length)
+        self.F = np.zeros(self._length)
+        self.G = np.zeros(self._length)
 
     ###########################################
     ##### Implulse Response Filters
@@ -65,56 +64,78 @@ class SimBiquad(Biquad):
                 self.u[b][n] = self.A * self.data[self.M*b+n] + self.B * self.data[self.M*b+n-1] + self.A * self.data[self.M*b+n-2]
 
         if quant is True:
-            self.u = np.floor(self.calc_n_bit(self.u, 12))
+            ## I was under the impression this would be Q14.2 but empirically this is wrong
+            self.u = self.calc_q_format(self.u, 12, 0)
+
+        self.y[b][0] = self.u[b][0]
+        self.y[b][1] = self.u[b][1]
 
     ##############
     ##### Pole FIR
     ##############
 
-    def run_poleFIR(self):
+    def run_poleFIR(self, quant = True):
         for b in range(self.length):
-            #Current clock single FIR output
 
-            self.f[b] = self.u[b][0]
+            # The bit width of f and g is large enough such that the inputs here cannot possibly exceed it
+            self.f[b] = self.u[b][0] + (self.Xn[1] * self.u[b - 1][self.M - 1])
             self.g[b] = self.u[b][1] + (self.Xn[1] * self.u[b][0])
-            
-            #Previous clocks output
-
-            self.f[b] += self.Xn[1] * self.u[b - 1][self.M - 1]
             
             for i in range(2, self.M - 1):
                 self.f[b] += self.Xn[i] * self.u[b - 1][self.M - i]
                 self.g[b] += self.Xn[i] * self.u[b - 1][self.M - i + 1]
+
+                if quant is True:
+                    self.f[b] = self.calc_q_format(self.f[b], 21, 27)
+                    self.g[b] = self.calc_q_format(self.g[b], 21, 27)
             
             self.g[b] += self.Xn[self.M - 1] * self.u[b - 1][2]
+            
+            if quant is True:
+                self.f[b] = self.calc_q_format(self.f[b], 21, 27)
+                self.g[b] = self.calc_q_format(self.g[b], 21, 27)
 
             self.F[b] = self.Dff * self.f[b - 1] + self.Dfg * self.g[b - 1] + self.f[b]
             self.G[b] = self.Egg * self.g[b - 1] + self.Egf * self.f[b - 1] + self.g[b]
+            
+            self.y[b][0] = self.F[b]
+            self.y[b][1] = self.G[b]
+        
+        if quant is True:
+            self.F = self.calc_q_format(self.F, 21, 27)
+            self.G = self.calc_q_format(self.G, 21, 27)
 
     ##############
     ##### Pole IIR
     ##############
 
-    def run_poleIIR(self):
-        self.F = self.calc_n_bit(self.F, 11)
-        self.G = self.calc_n_bit(self.G, 11)
-
+    def run_poleIIR(self, quant = True):
         for b in range(self.length):
             self.y[b][0] = (self.C0 * self.y[b - 2][0]) + (self.C1 * self.y[b - 2][1]) + self.F[b]
             self.y[b][1] = (self.C2 * self.y[b - 2][0]) + (self.C3 * self.y[b - 2][1]) + self.G[b]
 
+            if quant is True:
+                self.y[b] = self.calc_q_format(self.y[b], 21, 27)
+
+        if quant is True:
+            self.y = self.calc_q_format(self.y, 14, 10)
+
     ##############
     ##### Pole IIR
     ##############
 
-    def run_incremental(self):
+    def run_incremental(self, quant = True):
         for b in range(self.length):
             for i in range(2, self.M):
                 self.y[b][i] = self.a1 * self.y[b][i - 1] - self.a2 * self.y[b][i - 2] + self.u[b][i]
+                
+                if quant is True:
+                    self.y[b][i] = self.calc_q_format(self.y[b][i], 14, 10)
 
     ###########################################
     ##### Misceleneous
     ########################################### 
+
     def set_daq_coeffs(self, params):
         self.Xn = params[0]
 
@@ -132,7 +153,6 @@ class SimBiquad(Biquad):
         self.a2 = params[3][1]
 
         try:
-            
             self.A = params[4][0]
             self.B = params[4][1]
         except:
@@ -143,12 +163,16 @@ class SimBiquad(Biquad):
     ###########################################     
  
     def extract_biquad(self):
-        return Filterred(np.array( np.floor(self.calc_n_bit(self.y, 12)).flatten() ))
+        self.y = self.calc_q_format(self.y, 12, 0)
+        output = SimFilter(self.y.flatten())
+        output.waveform = output.waveform
+
+        return output
 
 if __name__ == '__main__':
     import sys, os
     sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))
-    from Waveforms.Filterred import Filterred, Waveform
+    from Waveforms.Filtered import Filtered, Waveform
     from Biquad import Biquad
 
     print(Biquad)

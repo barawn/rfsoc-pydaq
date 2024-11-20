@@ -5,8 +5,6 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 
-from Oscilloscope_Display import Oscilloscope_Display
-from Oscilloscope_Settings import Oscilloscope_Settings
 from Waveforms.Waveform import Waveform
 from widgets.SubmitButton import submitButton
 
@@ -43,8 +41,6 @@ class Oscilloscope(tk.Frame):
         self.save_trace_button = tk.Button(self.basic_frame, text = "Save trace")#, command = self.parent.trace_display.save_traces)
 
         self.update_button.grid(row=2, column=3)
-
-        
 
     def update_settings(self):
         self.get_channel_plot()
@@ -201,7 +197,7 @@ class Oscilloscope_Channels(tk.Frame):
         self.channel_scale_frame.grid(row=2, column=1)
 
 class Oscilloscope_Display(FigureCanvasTkAgg):
-    def __init__(self, parent, width=6, height=4):
+    def __init__(self, parent:Oscilloscope, width=6, height=4):
         self.parent = parent
         self.figure = Figure(figsize=(width, height))
 
@@ -257,7 +253,8 @@ class Oscilloscope_Display(FigureCanvasTkAgg):
         self.ax1.set_xlabel('Time (ns)', color='white')
         self.ax1.set_ylabel('ADC Counts', color='white')
 
-        self.ax1.legend(loc="lower right")
+        if all(not item for item in self.parent.arr_plot) == False:
+            self.ax1.legend(loc="lower right")
         self.draw()
 
     def plot_fft(self):

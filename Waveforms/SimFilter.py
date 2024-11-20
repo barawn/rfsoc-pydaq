@@ -8,115 +8,36 @@ from typing import List
 from .Waveform import Waveform
 
 class SimFilter(Waveform):
-    def __init__(self, waveform: List, sampleRate = 3.E9, start=280, end=800):
-        super().__init__(waveform, sampleRate = 3.E9)
-        
-        self.shortenWaveform(start, end)
-        self.setClocks()
+    def __init__(self, waveform: np.ndarray, sampleRate = 3.E9, tag : str = ""):
+        ## start=280, end=800 for Simulation biquad
+        super().__init__(waveform, sampleRate, tag)
 
-        self.decimated_WF = None
-        self.decimated_TL = None
+    @property
+    def waveform(self):
+        return super().waveform
 
-        self.periodogram_freqs = None
-        self.periodogram = None
-        self.periodogram_freq = None
-    
-    def convert_Decimated(self, start=0, end=7):
-        if self.clocks is None:
-            self.setClocks()
-        self.decimated_WF = np.zeros((len(self.clocks),2))
-        self.decimated_TL = np.zeros((len(self.clockTime),2))
-        length = len(self.clocks)
+    @waveform.setter
+    def waveform(self, arr):
+        if not isinstance(arr, np.ndarray):
+            raise ValueError("Waveform must be of type ndarray")
+        self._waveform = arr[35*8 : 99*8]
+        self._N = len(self.waveform)
 
-        for b in range(length):
-            self.decimated_WF[b, 0] = self.clocks[b, 0]  # First output of the clock period
-            self.decimated_WF[b, 1] = self.clocks[b, 1]  # Last output of the clock period
+#########################
+## Miscleneuous
+#########################
 
-            self.decimated_TL[b, 0] = self.clockTime[b, 0]
-            self.decimated_TL[b, 1] = self.clockTime[b, 1]
+    def calc_rms(self):
+        clocks = self.waveform.reshape(-1, 8)
 
-        self.decimated_WF = self.decimated_WF.flatten()
-        self.decimated_TL = self.decimated_TL.flatten()
+        decimated = np.zeros((len(clocks),2))
 
-    def Lomb_Scargle(self):
-        self.convert_Decimated()
+        for b, clock in enumerate(clocks):
+            decimated[b, 0] = clock[0]
+            decimated[b, 1] = clock[1]
 
-        n = len(self.decimated_WF)
-        dxmin = np.diff(self.decimated_TL).min()
-        duration = self.decimated_TL.ptp()
+        decimated = decimated.flatten()
 
-        self.periodogram_freqs = np.linspace(1/duration, n/duration, 5*n)
-
-        self.periodogram = lombscargle(self.decimated_TL, self.decimated_WF, self.periodogram_freqs)
-
-        self.periodogram_freq = self.periodogram.argmax()
-        print(self.periodogram_freq)
-
-
-    def plotWaveform(self, ax: plt.Axes=None, title = None, figsize=(25, 15)):
-        if ax is None:
-            fig, ax = plt.subplots(figsize=figsize)
-
-        x_axis = np.arange(len(self.waveform)) / 8
-
-        ax.plot(x_axis, self.waveform)
-
-        if title is not None:
-            ax.set_title(title)
-
-        ax.set_xlabel('Clocks')
-        ax.set_ylabel('ADC Counts', labelpad=-3.5)
-
-        self.setWaveFFT()
-        self.setPeaktoPeak()
-
-        stats_text = f"Peak-Peak : {self.peakToPeak:.2f} ADC\nFrequency : {self.frequencyFFT*10**(-6):.2f} MHz"
-        
-        ax.text(0.97, 0.97, stats_text, verticalalignment='top', horizontalalignment='right',
-            transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.5))
-        
-    
-    def plotDecimated(self, ax=None, title=None, figsize=(25, 15)):
-        
-        if self.decimated_WF is None:
-            self.convert_Decimated()
-
-        if ax is None:
-            fig, ax = plt.subplots(figsize=figsize)
-
-        ax.plot(self.decimated_TL, self.decimated_WF)
-
-        ax.set_xlabel('Samples')
-        ax.set_ylabel('ADC Counts')
-
-
-
-    def plotPeriodogram(self, ax=None, title=None, figsize=(25, 15)):
-        if self.periodogram_freqs is None:
-            self.Lomb_Scargle()
-
-        if ax is None:
-            fig, ax = plt.subplots(figsize=figsize)
-
-        # Convert frequencies to MHz (assuming decimated_TL is in seconds)
-        freqs_mhz = self.periodogram_freqs * 1e-6
-
-        ax.plot(freqs_mhz, self.periodogram)
-
-        if title:
-            ax.set_title(title)
-        ax.set_xlabel('Frequency (MHz)')
-        ax.set_ylabel('Power')
-        plt.show()
-
-    # def plotPeriodogram(self, ax: plt.Axes=None, title = None, figsize=(25, 15)):
-
-    #     self.Lomb_Scargle()
-
-    #     if ax is None:
-    #         fig, ax = plt.subplots(figsize=figsize)
-
-    #     ax.plot(self.periodogram_freqs, np.sqrt(4*self.periodogram/5*len(self.decimated_WF)))
-
-    #     ax.set_xlabel('Frequency (rad/s)')
-    #     ax.set_ylabel('No idea (arb)')
+        square_sum = sum(x ** 2 for x in decimated)
+        mean_square = square_sum / len(decimated)
+        return np.sqrt(mean_square)

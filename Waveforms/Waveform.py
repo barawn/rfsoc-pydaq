@@ -14,6 +14,33 @@ class Waveform():
         self._N = len(self.waveform)
         self._dt = 1/self._sample_frequency
 
+    def __len__(self):
+        return len(self.waveform)
+    
+    def __getitem__(self, index):
+        return self.waveform[index]
+    
+    def __setitem__(self, index, value):
+        self.waveform[index] = value
+
+    def __iter__(self):
+        return iter(self.waveform)
+    
+    def __add__(self, other):
+        return self.waveform + other
+
+    def __sub__(self, other):
+        return self.waveform - other
+
+    def __mul__(self, other):
+        return self.waveform * other
+
+    def __truediv__(self, other):
+        return self.waveform / other
+    
+    def __array__(self):
+        return self.waveform
+
     @property
     def waveform(self):
         return self._waveform
@@ -88,7 +115,6 @@ class Waveform():
         mean_square = square_sum / len(data)
         rms = np.sqrt(mean_square)
         return rms
-    
     
     #####
     ## Plotting stuff (Replacing the previous notebook structure, which was kinda horrible)

@@ -10,31 +10,37 @@ from typing import List
 from .Waveform import Waveform
 
 class Gated(Waveform):
-    def __init__(self, waveform: List, sampleRate=3.E9, start=280, end=792):
-        super().__init__(waveform, sampleRate)
+    def __init__(self, waveform: List, sampleRate=3.E9, start=280, end=792, tag : str = ""):
+        super().__init__(waveform, sampleRate, tag)
 
-        self.shortenWaveform(start, end)
-        self.setClocks()
+        # self.shorten_waveform(35*8, 99*8)
 
-    def plotWaveform(self, ax: plt.Axes=None, title = None, figsize=(25, 15)):
-        if ax is None:
-            fig, ax = plt.subplots(figsize=figsize)
+    @property
+    def waveform(self):
+        return super().waveform
 
-        x_axis = np.arange(len(self.waveform)) / 8
+    @waveform.setter
+    def waveform(self, arr):
+        if not isinstance(arr, np.ndarray):
+            raise ValueError("Waveform must be of type ndarray")
+        self._waveform = arr[35*8 : 99*8]
+        self._N = len(self.waveform)
 
-        ax.plot(x_axis, self.waveform)
+    # def plotWaveform(self, ax: plt.Axes=None, title = None, figsize=(25, 15)):
+    #     if ax is None:
+    #         fig, ax = plt.subplots(figsize=figsize)
 
-        if title is not None:
-            ax.set_title(title)
+    #     x_axis = np.arange(len(self.waveform)) / 8
 
-        ax.set_xlabel('Clocks')
-        ax.set_ylabel('ADC Counts', labelpad=-3.5)
+    #     ax.plot(x_axis, self.waveform)
 
-        self.setWaveFFT()
-        self.setRMS()
-        self.setPeaktoPeak()
+    #     if title is not None:
+    #         ax.set_title(title)
 
-        stats_text = f"Peak-Peak : {self.peakToPeak:.2f} ADC\nRMS : {self.RMS:.2f} ADC\nFrequency : {self.frequencyFFT*10**(-6):.2f} MHz"
+    #     ax.set_xlabel('Clocks')
+    #     ax.set_ylabel('ADC Counts', labelpad=-3.5)
+
+    #     stats_text = f"Peak-Peak : {self.calc_PtP():.2f} ADC\nRMS : {self.calc_rms():.2f} ADC"
         
-        ax.text(0.97, 0.97, stats_text, verticalalignment='top', horizontalalignment='right',
-            transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.5))
+    #     ax.text(0.97, 0.97, stats_text, verticalalignment='top', horizontalalignment='right',
+    #         transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.5))

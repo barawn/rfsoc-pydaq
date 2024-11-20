@@ -1,6 +1,5 @@
 ##Python Imports
 import numpy as np
-import tkinter as tk
 
 #System Imports
 import logging
@@ -11,27 +10,19 @@ sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))
 
 from RFSoC_Daq import RFSoC_Daq
 
-from widgets.SubmitButton import submitButton
-
 from Biquad import Biquad
-from waveframe.Waveframe import Waveframe
 
 from Waveforms.Waveform import Waveform
-from Waveforms.Filterred import Filterred
+from Waveforms.Filtered import Filtered
 from Waveforms.Gated import Gated
 
-logger = logging.getLogger(__name__)
-
 class Biquad_Daq(RFSoC_Daq, Biquad):
-    def __init__(self, root: tk.Tk = None, frame: tk.Frame = None, 
-                 numChannels: int = 4, numSamples: int = 2**10, 
-                 channelName = ["","","","","","","",""], A=0, B=1, P=0, theta=np.pi):
-        RFSoC_Daq.__init__(self, root, frame, numChannels, numSamples, channelName)
+    def __init__(self, sample_size: int = 200*8, 
+                 channel_names = ["ADC224_T0_CH0", "ADC224_T0_CH1", "Biquad_Output", None], A=0, B=1, P=0, theta=np.pi):
+        RFSoC_Daq.__init__(self, sample_size, channel_names)
         Biquad.__init__(self, A, B, P, theta)
 
-        self.sdv = None
-        self.rfsocLoad("zcubiquad")
-        # self.run_zeroFIR()
+        super().rfsocLoad('iir')
 
     ############################
     ##Maybe write your code here?
@@ -41,9 +32,8 @@ class Biquad_Daq(RFSoC_Daq, Biquad):
     ############################
     ##Sets
     ############################
-    def setSDV(self, sdv):
-        self.sdv = sdv
 
+    ##This isn't working so great. It's seems to preventing the properties to be overwritten again for some reason
     def reset(self):
         self.run_zeroFIR(0, 0)
         self.run_poleFIR(0,0,0,0,[0,0,0,0,0,0,0])
@@ -68,13 +58,13 @@ class Biquad_Daq(RFSoC_Daq, Biquad):
         for x in reversed(self.Xn[1:-1]):
             self.sdv.write(0x10, self.calc_18_bit(x))
 
-        ##Dfg
-        self.sdv.write(0x18, self.calc_18_bit(self.Dfg))
-
         ##Egg
         self.sdv.write(0x14, self.calc_18_bit(self.Egg))
         for x in reversed(self.Xn[1:]):
             self.sdv.write(0x14, self.calc_18_bit(x))
+
+        ##Dfg
+        self.sdv.write(0x18, self.calc_18_bit(self.Dfg))
 
         ##Egf
         self.sdv.write(0x1C, self.calc_18_bit(self.Egf))
@@ -99,7 +89,6 @@ class Biquad_Daq(RFSoC_Daq, Biquad):
 
     def run_Biquad(self):
         super().run_Biquad()
-        self.JupyterAcquire()
 
     ############################
     ##Extracts
@@ -109,7 +98,6 @@ class Biquad_Daq(RFSoC_Daq, Biquad):
 
     def extract_biquad(self):
         return self.waveforms[2]
-
 
     def get_Xns(self):
         return self.calc_4_bit(self.Xn)
@@ -130,86 +118,21 @@ class Biquad_Daq(RFSoC_Daq, Biquad):
         return self.get_Xns(), self.get_crosslink(), self.get_poleCoef(), self.get_incremental(), self.get_zero()
 
     ############################
-    ##App
-    ############################
-    
-    def submitAValue(self, value):
-        A = self.getSubmitInput(value, True)
-        logger.debug(f"You are setting the A to: {A}")
-        self.setA(A)
-
-    def submitBValue(self, value):
-        B = self.getSubmitInput(value, True)
-        logger.debug(f"You are setting the B to: {B}")
-        self.setB(B)
-
-    def submitPValue(self, value):
-        P = self.getSubmitInput(value, True)
-        logger.debug(f"You are setting the P to: {P}")
-        self.setP(P)
-
-    def submitThetaValue(self, value):
-        Theta = self.getSubmitInput(value, True)
-        logger.debug(f"You are setting the Theta to: {Theta}")
-        self.setTheta(Theta*np.pi)
-
-    def setHotKeys(self):
-        super().setHotKeys()
-        self.root.bind("<F7>", lambda event: self.update())
-
-    ############################
-    ##Display
+    ##DAQ Overload Methods
     ############################
 
-    def setDisplay(self):
-        button = self.root.nametowidget("button")
-        buttons = {}
-        buttons['Update'] = tk.Button(button,
-                                text = "Update",
-                                command = self.update)
-        
-        buttons['Update'].grid( row = 0, column=3, padx=5 )
+    def create_waveforms(self):
+        self.waveforms.append(Gated(self.extract_channel(ch=0), tag = self.channel_names[0]))
+        self.waveforms.append(Gated(self.extract_channel(ch=1), tag = self.channel_names[1]))
+        self.waveforms.append(Filtered(self.extract_channel(ch=2), tag = self.channel_names[2]))
+        self.waveforms.append(None)
 
-        submit = self.root.nametowidget("submit")
-        submits = {}
-        submits['SetA'] = submitButton(submit, "Set A:", 0, lambda: self.submitAValue(submits['SetA']), 10)
-        submits['SetB'] = submitButton(submit, "Set B:", 1, lambda: self.submitBValue(submits['SetB']), 11)
-        submits['SetP'] = submitButton(submit, "Set P:", 0, lambda: self.submitPValue(submits['SetP']), 12)
-        submits['SetTheta'] = submitButton(submit, "Set Theta * pi :", 1, lambda: self.submitThetaValue(submits['SetTheta']), 13)
-    
-    ############################
-    ##DAQ Methods
-    # I woudln't touch
-    ############################
+    def generate_waveforms(self):
+        self.run_Biquad()
+        super().generate_waveforms()
 
-    def rfsocLoad(self, hardware = None):
-        super().rfsocLoad(hardware)
-        try:
-            from serialcobsdevice import SerialCOBSDevice       ###Since this comes from the loaded zcuagc overlay it may not be recognised in vscode without the explicit import 
-            self.setSDV(SerialCOBSDevice('/dev/ttyPS1', 1000000))
-        except:
-            logger.debug("It would appear the overloay you have tried to load doesn't contain SerialCOBSDevice")
-        return
-
-    def GuiAcquire(self):
-        self.rfsocAcquire()
-        arr = [Gated,Gated,Filterred,Filterred]
-        for i in range(self.numChannels):
-            self.wf.waveframes[i].setWaveform(arr[i](self.adcBuffer[i] >> 4))
-            if self.wf.waveframes[i].toPlot == True:
-                self.wf.waveframes[i].notebook.plot()
-                
-        logger.debug("Acquired data and Plotted")
-
-    def JupyterAcquire(self):
-        self.rfsocAcquire()
-        
-        self.waveforms = []
-        
-        self.waveforms.append(Gated(self.adcBuffer[0] >> 4))
-        self.waveforms.append(Gated(self.adcBuffer[1] >> 4))
-        self.waveforms.append(Filterred(self.adcBuffer[2] >> 4))
-        # self.waveforms.append(Filterred(self.adcBuffer[3] >> 4))
+    def update_waveforms(self):
+        super().generate_waveforms()
 
 if __name__ == '__main__':
     import sys, os
@@ -219,11 +142,29 @@ if __name__ == '__main__':
     from RFSoC_Daq import RFSoC_Daq
     from Biquad import Biquad
 
-    print(type(RFSoC_Daq))
-    print(type(Biquad))
-
-    print(RFSoC_Daq.__class__)
-    print(Biquad.__class__)
+    daq = Biquad_Daq()
 
 
-    daq = Biquad_Daq(None, None, 4, 2**10)
+    print("\nStandard biquad setup (i.e. 1 sample delay) : ")
+    daq.run_Biquad()
+    # print(daq.waveforms[0].calc_rms())
+    # print(daq.waveforms[2].calc_rms())
+
+
+    print("\nSetting A = 7 (expect gain) : ")
+    daq.A=7
+
+    daq.run_Biquad()
+    # print(daq.waveforms[0].calc_rms())
+    # print(daq.waveforms[2].calc_rms())
+
+    # print('\n')
+    # print(len(daq.waveforms[0]))
+    # print(len(daq.waveforms[2]))
+
+    print("Relevant Stuff")
+
+    clocks = daq.waveforms[2].waveform.reshape(-1, 8)
+    print(daq.waveforms[2].find_first_clock(clocks))
+    clock = 130
+    print(daq.waveforms[2].waveform[clock*8:(clock+64)*8])

@@ -13,78 +13,103 @@ https://github.com/barawn/RFSoC-PYNQ-OSU
 which attempts to track/fix those issues, but please read the README
 there because the build system is disaster upon disaster.
 
-## Screenshot
-
-![Screenshot of RFSoC-PyDaq Running](https://github.com/pueo-pynq/rfsoc-pydaq/blob/main/rfsoc-pydaq-screenshot.png)
-
 ## Running
 
+RFSoC-PyDaq has been altered.
+
+Since all the overlays where all the same, zcumts will be exlcusively used, but the bitfile name will changed. The zcumts.py is also included.
+
+All bit streams are expected to be written in the form zcu111_<name of bit file>.bit . Now that I think about it, some people may not be using the zcu111 development board so ~2 lines will have to be alterred for that purpose.
+
+The overlay is what actually connects to the FPGA and writes the firmware, standard, agc, biquad, etc.
+
 To run rfsoc-pydaq, you need to have a directory which contains
-* the Python overlay describing the firmware you're using (e.g. ``zcumts.py``) and anything else it needs. These are usually in the ``python/`` subdirectory.
+* the Python overlay describing the firmware you're using (e.g. ``zcumts.py``) and anything else it needs.
 * the bitstream and HWH that overlay will load.
 
-Launch rfsoc-pydaq. Click the "Load" button and navigate to the directory containing the Python overlay. Select the Python overlay and click Open. This may take a moment,
-as it's loading the bitstream and likely configuring clocks.
+To run the overlay one needs to be in root access. Therefore I'd suggest running terminal_setup.sh and navigate to your local rfsoc-pydaq directory
 
-You can now click "Acquire" to view the ADC inputs of the RFSoC. You can interact with the RFSoC overlay via the Python console: it is called ``daq.dev``. You can
-also see the data in the buffer directly in the Python console - it is called ``daq.adcBuffer``. You can plot custom details from that buffer in the User frame
-via ``daq.wf[<channel number>].figs['user'].add_subplot(111).plot(<custom data output>)``. In addition, you can create a custom user callback which will _always_ plot
-what you're doing in the User frame by passing a function to ``daq.wf[<channel number>].set_user_callback()``. The user callback will be called with the data
-(now just a single array, since it's a single channel), the figure, and the canvas.
+`./terminal_setup.sh`
 
-You can change what the buttons do by accessing ``buttons['Load']``, ``buttons['Acquire']`` and ``buttons['User']``.
+This should also setup environmental requiremnts to run any TKinter GUI
 
-## Subdirectory stuff
-
-The app itself consists of a few features that I haven't seen fully
-embedded into a Python module yet.
-
-* A Python interactive console inside a Tk widget (pyconsole dir).
-  Not perfect yet, but usable. Allows building up auxiliary scripts
-  to modify the way the DAQ behaves.
-
-* A logging frame to capture output.
-
-* A tabbed plotting canvas (in progress)
-
-## New, most usable version yet!!!
-
-One should run with root. Can use sudo -i to get to root.
-
-Running app.py, will launch the TKinter GUI with the RFSoC_Daq class embedded.
-
-Use app.py -c {the name of your config} to apply a specific configurations (such as app.py -c "agc") 
-
-This is the super Daq class that contains all the useful basics for all firmware overlays loaded into the daq.dev
-
-The Daq class will store the Waveframes class that holds multiple Waveframe classes. These waveframe classes store the core GUI of the DAQ. The waveframe most importantly contains a tk.Notebook class called Notebook which will automatically manage, pack and dipslay plots that it gets from the PlotDipslay class that holds plots from the PlotsCanvas class (also in PlotDisplay.py). The managing of the waveform data is managed within Waveform class.
-
-### You the User!
-
-Ideally the only parts of the main program you should be editing is PlotCanvas, to add new plot method, and Waveform (though I am tempted to have this be a superclass that particular firmware/testing type directories have a derived class within), to add new data analyse techniques (this is were the FFT and etc are done)
-
-To use RFSoC-PyDAQ for you're own purposes:
-* Choose/make a directory for you intended purpose (say AGC)
-* Make a derived class of RFSoC_Daq (called name_Daq) to house core methods (such as runAGC unique to testing AGC firmware)
-* Maybe make another derived class of e.g. AGC_Daq called name_Test. This can store new unproven methods and leave a nice clean python file to edit on emacs locally on the FPGA if say you don't have you FPGA connected to the labnetwork/internet. 
-* If you feel the plots are not adequete for your task add a derived Notebook class that can add more plots to your Daq GUI. (New plots will need to be added as a method to PlotCanvas). You would only need to override the plot method in the derived Notebook. The rest is just general canvas managment stuff
-
-One can also override methods from RFSoC_Daq such as: 
-* Having the load method automatically load the appropriate overlay
-* StartWaveFrames method have the modules own notebook loaded
-* Have acquire automatically format ADC buffer data
-* More idk
-
-Oh yeah and you will have to edit the config file and add to the method getDaq in app.py if you are adding two much stuff
-
-### What this assumes
-
-* That you save data in /home/xilinx/data
-* That your loading overlay
+From here simply
+`python Daq_of_somekind.py`
+and it should run fine
 
 
-### Current issues
+## Key Differences
+* The daq module is simply seperate from any GUI
+* The GUI now emulates a oscilloscope
+* I broke the logger but fixed it here (worth mentioning)
+* Only one overlay, now input bitstream name
 
-* Since moving everything around a tonne the scrolled log no longer works. Log inputs still put in terminal but needs to be fixed.
 
-* Since I wrote this on my laptop and the OSU ZCU-111 doesn't have internet some troubleshooting to actually make this work on an FPGA might have slipped through when testing on the OSU zcu-111 and not be added to the git repo from my laptop. Also some methods or implementation won't be in the repo. Also certain save methods that previous worked have not been retested. Will have to wait to test on fully connected to lab-network and internet UCL zcu-111 to properly test the migration of all features. What I'm trying to say is the thing works but some auxillary functionality isn't fully tested yet
+## Basic Structure
+* A daq is defined by
+* * It's bitstream
+* * The number of samples (maximum 2^14) taken per internal capture
+* * The channel names
+* Bitsteam name can be changed for the basic daq but firmware specific daqs like biquad_daq will automatically run the biquad firmware. I had called mine zcu111_iir.bit so this might have to be altered
+* Number of samples can be changed at any time, however when the overlay is loaded, the adc memory will be defined by current value and will act as a maximum sample size. This was done since the biquad is limited to ~900 samples and the adc memory storing ~16,000 was a bit of a waste. Once loaded the adc memory size is not dynamic. Adc memory is passed to an adc buffer (whose size is the sample size). This is the raw adc output which is the wrong bit width.
+* Channel names should be a size 4 array of strings or None. None means the daq will effectively and permanently (in the class instance) ignore that channel. For instance only the first two output channels do anything anyway. Otherwise the names are used to tag the waveforms and label plots.
+* Waveform Class(es):
+The waveform class takes the corrected bit width of the adc output. Any waveform instance has access to useful methods, particularly containing to fourier transforms and the biquad_daqs waveforms automatically size to the ~64 clock gated output. All 4 waveform instances are stored in the field waveforms as an array of class instances
+* Internal captures will update channel waveform instances and in the GUI update the plots
+* The daq has two class instances at it's disposal
+* * self.dev which is the zcuMTS instance that communicates directly with the daq.
+* * self.sdv which is a serial cobs device instance which is used to read and write directly with the firmware (setting biquad parameters)
+* There is a basic App_GUI.py class that handles all the basic GUI elements required for all Daq_app's. This should be instantiated within a Daq_app class constructor
+* Daq_app's inherit from there 'mother-daq' and should only implement app_GUI and specific GUI elements (such as setting biquad parameters)
+
+## Using RFSoC's GUI
+The GUI consists of 4 elements
+* Oscilloscope
+* * Display
+* * Settings (which includes the DAQ settings)
+* Console
+* Log
+
+For this general Daq one must load a bitstream with the load button (default zcu111_top.bit). Afterwards load functionality will disappear because two overlays can't be used at once and you can't restart zocl whilst an overlay is running
+
+One can toggle what channels they want plotting. All data is taking regardless. If you toggle a field and want it reflected in the plots press update.
+
+Pressing Acquire will update the waveform instances, update the plot setting and plot the new waveforms
+
+Within the console the daq (whichever one is using) is called daq. Here one can access daq.dev, write using daq.sdv.write and access the waveforms
+
+The log is mainly here to confirm user inputs
+
+![Screenshot of RFSoC-PyDaq Running](https://github.com/pueo-pynq/rfsoc-pydaq/blob/rework/images/PyDaq.png)
+
+
+# AGC
+
+The agc runs like the basic daq but only the first two channels will run anything (agc output, raw input)
+
+The main parameters that change in the agc are it's scaling (0x10) and offest (0x14) which are daq properties .scaling and .offset. The agc must be loaded in and applied before it can work (automatically done setting paramters) and then run. This comes from the run_AGC method and the imaginatively named AGC button in the GUI. 
+
+Within the GUI pressing start_PID_Loop will start the active gain control so any inputs have the same amplitude. This should not freeze the rest of the GUI. My FPGA's physical output isn't currently working but this worked last time I ran it through an actual oscilloscope. One can always run the pid_loop methods within the daq.
+
+
+![Screenshot of AGC-PyDaq Running](https://github.com/pueo-pynq/rfsoc-pydaq/blob/rework/images/AGC_PyDaq.png)
+
+
+# Biquad
+
+The biquad daq inherits from the biquad class as well. A sim biquad was necessary for testigng and it creates a unified method scheme. Also it handles all the biquad programming in a neat place aware for data aquisition
+
+The biquad is defined by 4 parameters which in term calculate many coefficients. _update_coefficients must be run for the biquad to reflect changes in the coefficients. Also coefficient calculation as been simplified under the assumption of 8 samples per clock. If this changes this will have to reflect those changes. You can also set these coefficients directly
+
+The biquad has 4 sections to run
+
+* Running the zero fir
+* Running the pole fir
+* Running the pole iir
+* Running the incremental (the firmware doens't exist yet but the Daq is setup for when it does)
+
+All these will need to be run to get the expected output
+
+Worth noting the filtered waveform may be configured to 64 clocks which will cut off additional waveform generated from the iir. This can be edited.
+
+![Screenshot of Biquad-PyDaq Running](https://github.com/pueo-pynq/rfsoc-pydaq/blob/rework/images/Biquad_PyDaq.png)
