@@ -20,7 +20,19 @@ class SimFilter(Waveform):
     def waveform(self, arr):
         if not isinstance(arr, np.ndarray):
             raise ValueError("Waveform must be of type ndarray")
+        
+        del self._waveform
+
+        ##Input is most likely gated. Do you want the code to automatically find the start and end of the gate or just clock 35 to 98. Or maybe you're only running simulated data in which ignore gating
+
+        # first = self.find_first_clock(arr)
+        # last = self.find_last_clock(arr, first)
+        # self._waveform = arr[first*8 : last*8]
+
         self._waveform = arr[35*8 : 99*8]
+
+        # self._waveform = arr
+        
         self._N = len(self.waveform)
 
 #########################
@@ -28,16 +40,4 @@ class SimFilter(Waveform):
 #########################
 
     def calc_rms(self):
-        clocks = self.waveform.reshape(-1, 8)
-
-        decimated = np.zeros((len(clocks),2))
-
-        for b, clock in enumerate(clocks):
-            decimated[b, 0] = clock[0]
-            decimated[b, 1] = clock[1]
-
-        decimated = decimated.flatten()
-
-        square_sum = sum(x ** 2 for x in decimated)
-        mean_square = square_sum / len(decimated)
-        return np.sqrt(mean_square)
+        return 2*super().calc_rms()

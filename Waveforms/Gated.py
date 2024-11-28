@@ -23,6 +23,9 @@ class Gated(Waveform):
     def waveform(self, arr):
         if not isinstance(arr, np.ndarray):
             raise ValueError("Waveform must be of type ndarray")
+        
+        del self._waveform
+
         self._waveform = arr[35*8 : 99*8]
         self._N = len(self.waveform)
 

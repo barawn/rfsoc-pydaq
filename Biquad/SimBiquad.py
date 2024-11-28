@@ -2,10 +2,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import freqz
 
-# import sys, os
-# sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))
+import sys, os
+sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))
 
+from Waveforms.Gated import Gated
 from Waveforms.SimFilter import SimFilter
+from Waveforms.Waveform import Waveform
 from Biquad import Biquad
 
 class SimBiquad(Biquad):
@@ -67,8 +69,10 @@ class SimBiquad(Biquad):
             ## I was under the impression this would be Q14.2 but empirically this is wrong
             self.u = self.calc_q_format(self.u, 12, 0)
 
-        self.y[b][0] = self.u[b][0]
-        self.y[b][1] = self.u[b][1]
+        # Only if testing single zero fir output
+        for b in range(self.length):
+            self.y[b][0] = self.u[b][0]
+            self.y[b][1] = self.u[b][1]
 
     ##############
     ##### Pole FIR
@@ -121,7 +125,7 @@ class SimBiquad(Biquad):
             self.y = self.calc_q_format(self.y, 14, 10)
 
     ##############
-    ##### Pole IIR
+    ##### Restoring undecimated waveform
     ##############
 
     def run_incremental(self, quant = True):
@@ -160,30 +164,73 @@ class SimBiquad(Biquad):
 
     ###########################################
     ##### Access Outputs
-    ###########################################     
+    ########################################### 
+
+    def update_waveforms(self, input_data = None):
+        if input_data is None:
+            noise_input = np.zeros(200 * 8)
+            noise_input[35*8 : 99*8] = np.random.normal(0, 20, 512)
+            self.data = noise_input
+        else:
+            self.data = input_data
+        super().run_Biquad()
+
+    def extract_raw(self, quant = True):
+        if quant is True:
+            output = self.calc_q_format(self.data, 12, 0)
+
+        output = Gated(output)
+        output.waveform = output.waveform
+        return output
  
-    def extract_biquad(self):
-        self.y = self.calc_q_format(self.y, 12, 0)
+    def extract_biquad(self, quant = True):
+        if quant is True:
+            self.y = self.calc_q_format(self.y, 12, 0)
         output = SimFilter(self.y.flatten())
         output.waveform = output.waveform
 
         return output
+    
+    ############################
+    ##Spectral Analysis
+    ############################
+
+    def run_S21_response(self, magnitude, clocks, quant = True):
+        if quant is True:
+            S1 = Waveform(np.random.normal(0, magnitude, clocks*8))
+        else:
+            S1 = Waveform(self.calc_q_format(np.random.normal(0, magnitude, clocks*8), 12, 0))
+
+        biquad.data = S1.waveform
+        biquad.run_Biquad(quant=quant)
+        S2 = biquad.extract_biquad(quant=quant)
+
+        S21 = S2.fft/S1.fft
+        S21_mag = np.abs(S21[:S2.N//2])
+
+        return S2.xf, S21_mag
+
+    def run_impulse_response(self, magnitude, clocks, quant = True):
+        impulse = np.zeros(clocks*8)
+        impulse[0] = magnitude
+
+        biquad.data = impulse
+
+        biquad.run_Biquad(quant)
+        # output = biquad.extract_biquad(quant)
 
 if __name__ == '__main__':
     import sys, os
     sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))
-    from Waveforms.Filtered import Filtered, Waveform
+    from Waveforms.Filtered import Filtered
     from Biquad import Biquad
-
-    print(Biquad)
-
 
     num_clocks = 64
 
-    A = 1.2
-    B = -1.60591345526
-    P = 0.1
-    theta = 0.2
+    A = 0.8028107634961998
+    B = -0.9163499900207577
+    P = 0.7782168894289043
+    theta = 0.2996203532999784 * np.pi
     
     sample_rate = 3e9
     frequency = 400e6
@@ -193,17 +240,13 @@ if __name__ == '__main__':
     
     biquad = SimBiquad(data=sine_wave, A=A, B=B, P=P, theta=theta)
 
-    biquad.run_Biquad()
-    output = biquad.extract_biquad()
+    biquad.update_params(A, B, P, theta)
+    biquad.quantise_coeffs()
 
-    other = Waveform(sine_wave)
+    import time
+    start_time = time.time()
 
-    print(output.setFreqFFT()[100])
+    xf, S21_log_mag = biquad.S21_loop(10,17)
 
-    # fig, ax = plt.subplots(figsize=(14,7))
-
-    # output.plotFFT(ax)
-    # other.plotFFT(ax)
-
-    # plt.legend()
-    # plt.show()
+    end_time = time.time()
+    print(f"Time taken: {end_time - start_time} seconds")

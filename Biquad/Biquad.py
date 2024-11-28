@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+from Waveforms.Waveform import Waveform
+
 class Biquad:
     def __init__(self, A=0, B=1, P=0, theta=np.pi):
         ##Setting the parameters from initialisation
@@ -70,8 +72,8 @@ class Biquad:
 
     @theta.setter
     def theta(self, value):
-        if value < 0 or value > np.pi:
-            raise ValueError("Radians must be within semi-circle")
+        if value < 0 or value >= 2*np.pi:
+            raise ValueError("Radians must be within circle")
         self._theta = value
 
     def update_params(self, A, B, P, theta):
@@ -299,7 +301,7 @@ class Biquad:
 
     def run_Biquad(self):
         self.run_IIR()
-        # self.run_incremental()
+        self.run_incremental()
 
     ###########################################
     ##### Print Coefficients
@@ -387,11 +389,79 @@ class Biquad:
     ##Extracts
     ############################
 
-    def extract_raw(self):
+    def update_waveforms(self):
         pass
 
+    def extract_raw(self):
+        return Waveform()
+
     def extract_biquad(self):
-        pass
+        return Waveform()
+
+
+
+
+
+    ###########################################
+    ##### Spectral Analysis
+    ###########################################
+
+    ############################
+    ##Data Aquisition stuff for loops
+    ############################
+    ##This is to allow the frequency spectrums resolution to be roughly 1 MHz (or whatever depending on the loop). 
+    ##I'm assuming since it's random noise, stitching waveforms together doesn't matter
+    def single_capture(self, filtered_arr : np.ndarray, unfiltered_arr : np.ndarray, data : np.ndarray = None):
+        if data is None:
+            self.update_waveforms()
+        else:
+            self.update_waveforms(data)
+
+        filtered_arr = np.concatenate((filtered_arr, self.extract_biquad().waveform))
+
+        if unfiltered_arr is not None:
+            unfiltered_arr = np.concatenate((unfiltered_arr, self.extract_raw().waveform))
+
+            return filtered_arr, unfiltered_arr
+        else:
+            return filtered_arr
+        
+    def extented_capture(self, loop=6):
+        unfiltered_arr = np.array([])
+        filtered_arr = np.array([])
+        for i in range(loop):
+            filtered_arr, unfiltered_arr = self.single_capture(filtered_arr, unfiltered_arr)
+
+        filtered_output = Waveform(filtered_arr)
+        unfiltered_output = Waveform(unfiltered_arr)
+
+        del filtered_arr, unfiltered_arr
+
+        return filtered_output, unfiltered_output
+    
+    def single_group_delay(self, group_delay_arr : list, loop : int, x_omega):
+        filtered, raw = self.extented_capture(loop)
+        H = filtered.fft/raw.fft
+        phase_response = np.unwrap(np.angle(H))
+
+        group_delay_arr.append(-np.gradient(phase_response, x_omega))
+
+        del phase_response, H
+
+    def group_delay_loop(self, iterations = 100, loop = 6):
+        group_delay_arr = []
+        N = 512*loop #64 clocks, 8 samples per clock, multiplied by loop number
+        T = 3.E9
+        dt = 1/T
+        xf = np.linspace(0.0, 1.0 / (2 * dt), N)
+        x_omega = 2 * np.pi * xf
+
+        for i in range(iterations):
+            self.single_group_delay(group_delay_arr, loop, x_omega)
+
+        avg_group_delay = np.mean(group_delay_arr, axis=0)
+
+        return xf, avg_group_delay
 
 if __name__ == '__main__':
     print(type(Biquad))

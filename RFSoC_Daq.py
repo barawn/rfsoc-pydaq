@@ -76,6 +76,7 @@ class RFSoC_Daq:
     
     @adcBuffer.setter
     def adcBuffer(self, value):
+        del self._adcBuffer
         self._adcBuffer = value
     
     def _reset_adcBuffer(self):
@@ -198,7 +199,8 @@ class RFSoC_Daq:
                 self.waveforms.append(Waveform(self.extract_channel(ch=i), tag = channel))
             else:
                 self.waveforms.append(None)
-        
+    
+    # This should really be called update, but I guess functionally it is generating waveforms from the new internal capture, though the instance is only being updated
     def generate_waveforms(self):
         self.rfsocAcquire()
 

@@ -17,7 +17,7 @@ from Waveforms.Filtered import Filtered
 from Waveforms.Gated import Gated
 
 class Biquad_Daq(RFSoC_Daq, Biquad):
-    def __init__(self, sample_size: int = 200*8, 
+    def __init__(self, sample_size: int = 160*8, 
                  channel_names = ["ADC224_T0_CH0", "ADC224_T0_CH1", "Biquad_Output", None], A=0, B=1, P=0, theta=np.pi):
         RFSoC_Daq.__init__(self, sample_size, channel_names)
         Biquad.__init__(self, A, B, P, theta)
@@ -86,9 +86,9 @@ class Biquad_Daq(RFSoC_Daq, Biquad):
         self.sdv.write(0x0C, self.calc_18_bit(self.a2))
         self.sdv.write(0x00, 1)
 
-
     def run_Biquad(self):
         super().run_Biquad()
+        # self.generate_waveforms()
 
     ############################
     ##Extracts
@@ -134,6 +134,30 @@ class Biquad_Daq(RFSoC_Daq, Biquad):
     def update_waveforms(self):
         super().generate_waveforms()
 
+    ############################
+    ##Spectral Analysis
+    ############################
+
+    ## Just incase one wants to use the simBiquad for the same internal captures. Most likely to use for the incremental part
+    def extented_capture_sim(self, sim : Biquad, loop=6):
+        unfiltered_arr = np.array([])
+        filtered_arr = np.array([])
+
+        filtered_arr_sim = np.array([])
+
+        for i in range(loop):
+            filtered_arr, unfiltered_arr = self.single_capture(filtered_arr, unfiltered_arr)
+            filtered_arr_sim = sim.single_capture(filtered_arr_sim, unfiltered_arr = None, data = self.adcBuffer[0] >> 4)
+
+        filtered_output = Waveform(filtered_arr)
+        unfiltered_output = Waveform(unfiltered_arr)
+        sim_output = Waveform(filtered_arr_sim)
+
+        del filtered_arr, unfiltered_arr, filtered_arr_sim
+
+        return filtered_output, unfiltered_output, sim_output
+    
+
 if __name__ == '__main__':
     import sys, os
 
@@ -141,30 +165,31 @@ if __name__ == '__main__':
 
     from RFSoC_Daq import RFSoC_Daq
     from Biquad import Biquad
+    from SimBiquad import SimBiquad
+
+    import matplotlib.pyplot as plt
 
     daq = Biquad_Daq()
+    sim = SimBiquad()
 
+    A = 0.8028107634961998
+    B = -0.9163499900207577
+    P = 0.7782168894289043
+    theta = 0.2996203532999784 * np.pi
 
-    print("\nStandard biquad setup (i.e. 1 sample delay) : ")
+    daq.update_params(A, B, P, theta)
+    daq.quantise_coeffs()
     daq.run_Biquad()
-    # print(daq.waveforms[0].calc_rms())
-    # print(daq.waveforms[2].calc_rms())
+    sim.update_params(A, B, P, theta)
+    sim.quantise_coeffs()
+
+    sim.data = daq.adcBuffer[0] >> 4
+
+    # for _ in range(10):
+    daq.update_waveforms()
+    sim.data = daq.adcBuffer[2] >> 4
+
+    sim.run_IIR()
+    sim_output = sim.extract_biquad()
 
 
-    print("\nSetting A = 7 (expect gain) : ")
-    daq.A=7
-
-    daq.run_Biquad()
-    # print(daq.waveforms[0].calc_rms())
-    # print(daq.waveforms[2].calc_rms())
-
-    # print('\n')
-    # print(len(daq.waveforms[0]))
-    # print(len(daq.waveforms[2]))
-
-    print("Relevant Stuff")
-
-    clocks = daq.waveforms[2].waveform.reshape(-1, 8)
-    print(daq.waveforms[2].find_first_clock(clocks))
-    clock = 130
-    print(daq.waveforms[2].waveform[clock*8:(clock+64)*8])

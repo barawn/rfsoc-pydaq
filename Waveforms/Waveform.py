@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from scipy.fft import fft
+from scipy.signal import group_delay
 
 class Waveform():
     def __init__(self, waveform: np.ndarray, sample_frequency = 3.E9, tag : str = ""):
@@ -49,6 +50,9 @@ class Waveform():
     def waveform(self, arr):
         if not isinstance(arr, np.ndarray):
             raise ValueError("Waveform must be of type ndarray")
+
+        del self._waveform
+        
         self._waveform = arr
         self._N = len(self.waveform)
 
@@ -85,6 +89,10 @@ class Waveform():
     @property
     def mag_spectrum(self):
         return np.abs(self.fft[:self.N//2]) * 2 / self.N
+    
+    @property
+    def group_delay(self):
+        return group_delay((self.waveform, self.sample_frequency))
 
     #####
     ## Clock formatting stuff
@@ -108,6 +116,24 @@ class Waveform():
     #####
     ## Miscellaneous
     #####
+
+    def find_first_clock(self, arr):
+        clocks = arr.reshape(-1, 8)
+        first = 0
+        for i, clock in enumerate(clocks):
+            if any(x != 0 for x in clock[:2]):
+                first = i
+                break
+        return first
+    
+    def find_last_clock(self, arr, first):
+        clocks = arr.reshape(-1, 8)
+        last = first
+        for i, clock in enumerate(clocks[first : ], start=first):
+            if all(x == 0 for x in clock[:2]):
+                last = i
+                break
+        return last
 
     ## I end up always having to write one of these anyway
     def calculate_rms(self, data):

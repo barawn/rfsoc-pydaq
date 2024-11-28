@@ -29,57 +29,21 @@ class Filtered(Waveform):
     def waveform(self, arr):
         if not isinstance(arr, np.ndarray):
             raise ValueError("Waveform must be of type ndarray")
+        
+        del self._waveform
+
+        ##Due to the inclusion of the iir portion the number of clocks with data might extend 64.
+        # last = self.find_last_clock(arr, 53)
+        # self._waveform = arr[53*8 : last*8]
+
         self._waveform = arr[53*8 : 117*8]
         self._N = len(self.waveform)
-
-#########################
-## Automatic gating
-#########################
-    def find_first_clock(self, clocks):
-        first_clock=0
-        for clock in clocks:
-            if clock[0] == 0 and clock[1] == 0:
-                first_clock+=1
-            else:
-                break
-        return first_clock
-    
-    def find_last_clock(self, start, clocks):
-        last_clock=start
-        for i in range(start, len(clocks)):
-            if clocks[i][0] == 0 and clocks[i][1] == 0:
-                break
-            else:
-                last_clock+=1
-        return last_clock
-    
-    def set_waveform_range(self):
-        clocks = self.waveform.reshape(-1, 8)
-
-        first_clock = self.find_first_clock(clocks)
-        last_clock = first_clock+64 ##This will ignore any only iir part
-        # last_clock = self.find_last_clock(first_clock, clocks)
-        self.shorten_waveform(first_clock*8, last_clock*8)
-
 
 #########################
 ## Miscleneuous
 #########################
     def calc_rms(self):
-        clocks = self.waveform.reshape(-1, 8)
-
-        decimated = np.zeros((len(clocks),2))
-
-        for b, clock in enumerate(clocks):
-            decimated[b, 0] = clock[0]
-            decimated[b, 1] = clock[1]
-
-        decimated = decimated.flatten()
-
-        square_sum = sum(x ** 2 for x in decimated)
-        mean_square = square_sum / len(decimated)
-        return np.sqrt(mean_square)
-
+        return 2*super().calc_rms()
 
 #########################
 ## Plots
