@@ -76,7 +76,7 @@ class Biquad:
             raise ValueError("Radians must be within circle")
         self._theta = value
 
-    def update_params(self, A, B, P, theta):
+    def update_params(self, A, B, P, theta, **kwargs):
         self.A = A
         self.B = B
         self.P = P
@@ -409,8 +409,17 @@ class Biquad:
     ############################
     ##Data Aquisition stuff for loops
     ############################
+
+    def capture(self, data : np.ndarray = None):
+        if data is None:
+            self.update_waveforms()
+        else:
+            self.update_waveforms(data)
+
+        return self.extract_biquad(), self.extract_raw()
+
     ##This is to allow the frequency spectrums resolution to be roughly 1 MHz (or whatever depending on the loop). 
-    ##I'm assuming since it's random noise, stitching waveforms together doesn't matter
+    ##I'm assuming since it's random noise, stitching waveforms together doesn't matter. Turns out it does matter
     def single_capture(self, filtered_arr : np.ndarray, unfiltered_arr : np.ndarray, data : np.ndarray = None):
         if data is None:
             self.update_waveforms()

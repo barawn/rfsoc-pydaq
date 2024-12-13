@@ -22,7 +22,7 @@ class Biquad_Daq(RFSoC_Daq, Biquad):
         RFSoC_Daq.__init__(self, sample_size, channel_names)
         Biquad.__init__(self, A, B, P, theta)
 
-        super().rfsocLoad('iir')
+        super().rfsocLoad('biquad8')
 
     ############################
     ##Maybe write your code here?
@@ -137,6 +137,12 @@ class Biquad_Daq(RFSoC_Daq, Biquad):
     ############################
     ##Spectral Analysis
     ############################
+    def capture_sim(self,  sim : Biquad):
+        self.update_waveforms()
+
+        sim.update_waveforms(data = self.adcBuffer[0] >> 4)
+
+        return self.extract_biquad(), self.extract_raw(), sim.extract_biquad()
 
     ## Just incase one wants to use the simBiquad for the same internal captures. Most likely to use for the incremental part
     def extented_capture_sim(self, sim : Biquad, loop=6):

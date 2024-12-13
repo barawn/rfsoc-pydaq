@@ -38,6 +38,12 @@ class SimBiquad(Biquad):
         self._data = value
         self._update_outputs()
 
+    def quant_data(self, value:np.ndarray, quant = True):
+        if quant is True:
+            self.data = self.calc_q_format(value, 12, 0)
+        else:
+            self.data = value
+
     @property
     def length(self):
         return self._length
@@ -66,8 +72,8 @@ class SimBiquad(Biquad):
                 self.u[b][n] = self.A * self.data[self.M*b+n] + self.B * self.data[self.M*b+n-1] + self.A * self.data[self.M*b+n-2]
 
         if quant is True:
-            ## I was under the impression this would be Q14.2 but empirically this is wrong
-            self.u = self.calc_q_format(self.u, 12, 0)
+            # self.u = self.calc_q_format(self.u, 12, 0)
+            self.u = self.calc_q_format(self.u, 14, 2)
 
         # Only if testing single zero fir output
         for b in range(self.length):
@@ -166,13 +172,8 @@ class SimBiquad(Biquad):
     ##### Access Outputs
     ########################################### 
 
-    def update_waveforms(self, input_data = None):
-        if input_data is None:
-            noise_input = np.zeros(200 * 8)
-            noise_input[35*8 : 99*8] = np.random.normal(0, 20, 512)
-            self.data = noise_input
-        else:
-            self.data = input_data
+    def update_waveforms(self, data):
+        self.data = data
         super().run_Biquad()
 
     def extract_raw(self, quant = True):
@@ -182,15 +183,15 @@ class SimBiquad(Biquad):
         output = Gated(output)
         output.waveform = output.waveform
         return output
- 
-    def extract_biquad(self, quant = True):
+
+     
+    def extract_biquad(self, quant = True, buffer = 0):
         if quant is True:
             self.y = self.calc_q_format(self.y, 12, 0)
         output = SimFilter(self.y.flatten())
-        output.waveform = output.waveform
-
+        output.waveform = output.waveform[buffer*8:]
         return output
-    
+ 
     ############################
     ##Spectral Analysis
     ############################
@@ -210,6 +211,47 @@ class SimBiquad(Biquad):
 
         return S2.xf, S21_mag
 
+    def run_S21_response_loop(self, filter, magnitude, clocks, loop=100):
+
+        data = np.zeros((clocks+5) * 8)
+
+        S21_quant_arr = []
+        S21_arr = []
+        for _ in range(loop):
+            noise = np.random.normal(0, magnitude, clocks*8)
+            quant_noise = self.calc_q_format(noise, 12, 0)
+
+            data[5*8 : (clocks+5)*8] = quant_noise
+
+            S1_quant = Waveform(quant_noise)
+            
+            self.update_params(**filter.get_params())
+            self.quantise_coeffs()
+            self.data = data
+            self.run_Biquad(quant=True)
+            S2_quant = self.extract_biquad(quant=True, buffer=5)
+
+            data[5*8 : (clocks+5)*8] = noise
+            S1 = Waveform(noise)
+
+            self.update_params(**filter.get_params())
+            self.data = data
+            self.run_Biquad(quant=False)
+            # self.run_IIR(quant=False)
+            S2 = self.extract_biquad(quant=False, buffer=5)
+
+            S21_quant_arr.append(S2_quant.fft/S1_quant.fft)
+            S21_arr.append(S2.fft/S1.fft)
+
+        S21_mean_quant = [sum(x) / len(S21_quant_arr) for x in zip(*S21_quant_arr)]
+        S21_mean = [sum(x) / len(S21_arr) for x in zip(*S21_arr)]
+
+        S21_log_mag_quant = np.abs(S21_mean_quant[:len(S21_mean_quant)//2])
+        S21_log_mag = np.abs(S21_mean[:len(S21_mean)//2])
+
+        return S2.xf, S21_log_mag_quant, S21_log_mag
+    
+
     def run_impulse_response(self, magnitude, clocks, quant = True):
         impulse = np.zeros(clocks*8)
         impulse[0] = magnitude
@@ -219,34 +261,73 @@ class SimBiquad(Biquad):
         biquad.run_Biquad(quant)
         # output = biquad.extract_biquad(quant)
 
+
+def rms(data):
+    square_sum = sum(x ** 2 for x in data)
+    mean_square = square_sum / len(data)
+    return np.sqrt(mean_square)
+
+##Calculates the quantisation error in the biquad. Use the new Filter class
+def calculate_error(biquad:Biquad, filter):
+    length = 32
+    result = []
+    arr = np.arange(-2048, 2048, 1)
+    x_axis = []
+    for i in arr:
+        if i == 0:
+            continue
+        x_axis.append(i)
+        magnitude = i
+
+        biquad.update_params(**filter.get_params())
+        biquad.quantise_coeffs()
+
+        biquad.run_impulse_response(magnitude, length)
+        output1 = biquad.extract_biquad()
+
+        biquad.update_params(**filter.get_params())
+        biquad.run_impulse_response(magnitude, length, quant=False)
+        output2 = biquad.extract_biquad(quant=False)
+
+        result.append(rms(output2-output1))
+
+    return x_axis, result
+
+
 if __name__ == '__main__':
     import sys, os
     sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))
     from Waveforms.Filtered import Filtered
     from Biquad import Biquad
+    from Filter import Filter
+    from SpectrumAnalyser import SpectrumAnalyser
 
-    num_clocks = 64
+    filter = Filter()
+    sam = SpectrumAnalyser()
 
-    A = 0.8028107634961998
-    B = -0.9163499900207577
-    P = 0.7782168894289043
-    theta = 0.2996203532999784 * np.pi
-    
-    sample_rate = 3e9
-    frequency = 400e6
-    
-    t = np.arange(num_clocks * 8) / sample_rate
-    sine_wave = 72*np.sin(2 * np.pi * frequency * t)
-    
-    biquad = SimBiquad(data=sine_wave, A=A, B=B, P=P, theta=theta)
+    fz = 375
 
-    biquad.update_params(A, B, P, theta)
+    filter.calc_params(fz)
+
+    biquad = SimBiquad()
+    biquad.update_params(**filter.get_params())
     biquad.quantise_coeffs()
 
-    import time
-    start_time = time.time()
 
-    xf, S21_log_mag = biquad.S21_loop(10,17)
+    magnitude = 100
+    num_clocks = 64
 
-    end_time = time.time()
-    print(f"Time taken: {end_time - start_time} seconds")
+    noise_input = np.zeros(num_clocks * 8)
+    noise = np.random.normal(0, magnitude, num_clocks*8)
+    noise_input[35*8: 99*8] = noise
+
+    biquad.data = noise_input
+    
+
+    # import time
+    # start_time = time.time()
+
+    # xf, S21_log_mag = sam.S21_loop(10,17)
+
+    # end_time = time.time()
+    # print(f"Time taken: {end_time - start_time} seconds")

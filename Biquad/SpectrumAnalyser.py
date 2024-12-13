@@ -74,18 +74,19 @@ class SpectrumAnalyser():
     ##### Main Processes
     ###########################################
 
-    def single_S21(self, biquad : Biquad, loop):
-        self.S2, self.S1 = biquad.extented_capture(loop)
+    def single_S21(self, biquad : Biquad):
+        # self.S2, self.S1 = biquad.extented_capture(loop)
+        self.S2, self.S1 = biquad.capture()
 
-    def S21_loop(self, biquad : Biquad, iterations = 100, loop = 6):
+    def S21_loop(self, biquad : Biquad, iterations = 100):
         S21_arr = []
-        self.N = 512*loop
+        self.N = 512
         T = 3.E9
         dt = 1/T
         xf = np.linspace(0.0, 1.0 / (2 * dt), self.N // 2)
 
         for _ in range(iterations):
-            self.single_S21(biquad, loop)
+            self.single_S21(biquad)
             S21_arr.append(self.S21)
 
         S21_mean = [sum(x) / len(S21_arr) for x in zip(*S21_arr)]
@@ -96,19 +97,19 @@ class SpectrumAnalyser():
     ## Comparing Daq to Sim
     #################
 
-    def single_S21_sim(self, daq : Biquad, sim : Biquad, loop : int):
-        self.S2, self.S1, self.S3 = daq.extented_capture_sim(sim, loop)
+    def single_S21_sim(self, daq : Biquad, sim : Biquad):
+        self.S2, self.S1, self.S3 = daq.capture_sim(sim)
 
-    def S21_loop_sim(self, daq : Biquad, sim : Biquad, iterations = 100, loop = 6):
+    def S21_loop_sim(self, daq : Biquad, sim : Biquad, iterations = 100):
         S21_arr = []
         S21_arr_sim = []
-        self.N = 512*loop
+        self.N = 512
         T = 3.E9
         dt = 1/T
         xf = np.linspace(0.0, 1.0 / (2 * dt), self.N // 2)
 
         for _ in range (iterations):
-            self.single_S21_sim(daq, sim, loop)
+            self.single_S21_sim(daq, sim)
             S21_arr.append(self.S21)
             S21_arr_sim.append(self.S31)
 
