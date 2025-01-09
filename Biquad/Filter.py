@@ -167,6 +167,9 @@ class Filter():
     ##### Complex Gets
     ###########################################
 
+    def get_Biquad(self):
+        return {"A" : self.A, "B" : self.B, "P" : self.P, "theta" : self.theta_p}
+
     def get_params(self):
         return {"A" : self.A, "B" : self.B, "P" : self.P, "theta" : self.theta_p,
                 "fz" : self.fz*10**6, "fp" : self.fp*10**6, "theta_z" : self.theta_z, "theta_p" : self.theta_p}

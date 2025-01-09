@@ -22,7 +22,8 @@ class Biquad_Daq(RFSoC_Daq, Biquad):
         RFSoC_Daq.__init__(self, sample_size, channel_names)
         Biquad.__init__(self, A, B, P, theta)
 
-        super().rfsocLoad('biquad8')
+        ##This will depend on what you have called the file. Mines called zcu111_biquad.bit
+        super().rfsocLoad('biquad')
 
     ############################
     ##Maybe write your code here?
@@ -98,6 +99,30 @@ class Biquad_Daq(RFSoC_Daq, Biquad):
 
     def extract_biquad(self):
         return self.waveforms[2]
+    
+    ## Since it doesn't exist in firmware yet and is computatiionally simple
+    def extract_incremental(self):
+
+        input = self.waveforms[0]
+
+        u = np.zeros((64*8, 8))
+        for b in range(64):
+            for n in range(8):
+                u[b][n] = self.A * input[8*b+n] + self.B * input[8*b+n-1] + self.A * input[8*b+n-2]
+
+
+        u = self.calc_q_format(u, 14, 2)
+
+        y = self.waveforms[2].waveform.reshape(-1, 8)
+
+        for b in range(64):
+            for i in range(2, 8):
+                y[b][i] = self.a1 * y[b][i - 1] - self.a2 * y[b][i - 2] + u[b][i]
+
+        y[b][i] = self.calc_q_format(y[b][i], 12, 0)
+        
+        output = Waveform(y.flatten())
+        return output
 
     def get_Xns(self):
         return self.calc_4_bit(self.Xn)

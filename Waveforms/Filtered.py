@@ -33,7 +33,8 @@ class Filtered(Waveform):
         del self._waveform
 
         ##Due to the inclusion of the iir portion the number of clocks with data might extend 64.
-        # last = self.find_last_clock(arr, 53)
+        # last = self.find_last_clock(arr, 117)
+        # print(last)
         # self._waveform = arr[53*8 : last*8]
 
         self._waveform = arr[53*8 : 117*8]

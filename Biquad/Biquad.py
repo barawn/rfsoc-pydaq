@@ -398,10 +398,6 @@ class Biquad:
     def extract_biquad(self):
         return Waveform()
 
-
-
-
-
     ###########################################
     ##### Spectral Analysis
     ###########################################

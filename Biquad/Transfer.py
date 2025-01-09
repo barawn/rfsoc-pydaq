@@ -121,9 +121,30 @@ class Transfer():
     ##### Class Methods
     ###########################################
 
-    ## z here is a signal array 
-    def transfer_function_signal(self, z : list):
-        return (self.A*z - 2*self.A*np.cos(self.theta_z)*np.pad(z[:-1], (1, 0)) + self.A*np.pad(z[:-2], (2, 0))) / (1 - 2*self.P*np.cos(self.theta_p)*np.pad(z[:-1], (1, 0)) + self.P**2*np.pad(z[:-2], (2, 0)))
+    def transfer_function_signal(self, z: np.ndarray):
+        # Coefficients derived from the transfer function
+        b0 = self.A
+        b1 = -2 * self.A * np.cos(self.theta_z)
+        b2 = self.A
+        a0 = 1
+        a1 = -2 * self.P * np.cos(self.theta_p)
+        a2 = self.P**2
+
+        # Initialize output array
+        y = np.zeros_like(z, dtype=np.float64)  # Ensure float precision for intermediate results
+        x = z  # Input signal
+
+        # Apply the difference equation
+        for n in range(len(z)):
+            y[n] = (
+                b0 * x[n]
+                + (b1 * x[n - 1] if n - 1 >= 0 else 0)
+                + (b2 * x[n - 2] if n - 2 >= 0 else 0)
+                - (a1 * y[n - 1] if n - 1 >= 0 else 0)
+                - (a2 * y[n - 2] if n - 2 >= 0 else 0)
+            )
+        return y
+
 
     ## z will be represented as exp(i*omega), since this is only dependent on the frequency
     def transfer_function_frequency(self, freq : int):
@@ -139,7 +160,7 @@ class Transfer():
     def response(self, Hjw):
         return np.abs(Hjw), np.angle(Hjw)
     
-    # -3dB bandwidth
+    # -3dB bandwidth. This obviosuly depends on the binning and frequency resolution
     def calc_quality(self, frequencies, mag_spectrum, fc):
         max_index = np.argmax(mag_spectrum)
         max_dB = mag_spectrum[max_index]
@@ -158,7 +179,6 @@ class Transfer():
 
 
         return quality
-
         
 if __name__ == '__main__':
     
@@ -168,16 +188,48 @@ if __name__ == '__main__':
 
     Hz = Transfer()
 
-    filter.calc_params(460)
+    filter.calc_params(375)
+    print(filter)
     # filter.A = 0.8028107634961998
-    print(filter.fp)
-    print(filter.P)
     # filter.fp = 459.5
     # filter.P = 0.94
     # filter.fp = 440
     # filter.P = 0.72
 
     Hz.set_params(**filter.get_params())
+
+    ##Waveform output
+    
+    # clock_num = 64
+    # buffer = 2
+    # mag = 2048
+    # data = np.zeros((clock_num+2*buffer) * 8)
+    # uniform_noise = np.random.uniform(-mag, mag-1, clock_num*8)
+    # gaussian_noise = np.random.normal(0, mag, clock_num*8)
+    # sine_array = np.sin(2*np.pi * np.linspace(0,1,clock_num*8))
+    # data[buffer*8 : (clock_num+buffer)*8] = uniform_noise
+
+    # output = Hz.transfer_function_signal(data)
+
+    # fig, ax = plt.subplots()
+
+    # x = np.arange(0, len(data)/Hz.fs, 1/Hz.fs)
+
+    # ax.plot(x, data, label='Input Waveform')
+    # ax.plot(x, output, label='Output Waveform')
+    # ax.axhline(y=2047, color='red', linestyle='--', linewidth=1, label='Output Limit')
+    # ax.axhline(y=-2048, color='red', linestyle='--', linewidth=1)
+    # ax.set_xlabel("Time (Seconds)")
+    # ax.set_ylabel("Output (ADC Counts)")
+    # ax.set_title("Difference Equation maximum input and overflowing output")
+
+    # ax.text(0.97, 0.60, filter.__str__(), verticalalignment='top', horizontalalignment='right', transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.5))
+
+    # ax.legend()
+    # plt.show()
+
+
+    ##Bode Plot
 
     frequencies = np.linspace(0, 1500E6, 1000)
     magnitude = []
